@@ -73,9 +73,18 @@ func (s *admissionWebhookServer) Review(in *admissionv1.AdmissionRequest) *admis
 	annotation := annotations[s.config.Annotation]
 
 	if annotation != "" {
+		envs := s.config.GetOrResolveEnvs()
+		// Get NSM environments
+		for i := range spec.Containers {
+			for _, e := range spec.Containers[i].Env {
+				if strings.HasPrefix(e.Name, "NSM_") {
+					envs = append(envs, e)
+				}
+			}
+		}
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
-			s.createInitContainerPatch(p, annotation, spec.InitContainers),
-			s.createContainerPatch(p, annotation, spec.Containers),
+			s.createInitContainerPatch(p, annotation, spec.InitContainers, envs),
+			s.createContainerPatch(p, annotation, spec.Containers, envs),
 			s.createVolumesPatch(p, spec.Volumes),
 		})
 		if err != nil {
@@ -164,11 +173,11 @@ func (s *admissionWebhookServer) createVolumesPatch(p string, volumes []corev1.V
 	return jsonpatch.NewOperation("add", path.Join(p, "volumes"), volumes)
 }
 
-func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initContainers []corev1.Container) jsonpatch.JsonPatchOperation {
+func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initContainers []corev1.Container, envs []corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	for _, img := range s.config.InitContainerImages {
 		initContainers = append(initContainers, corev1.Container{
 			Name:            nameOf(img),
-			Env:             append(s.config.GetOrResolveEnvs(), corev1.EnvVar{Name: s.config.NSURLEnvName, Value: v}),
+			Env:             append(envs, corev1.EnvVar{Name: s.config.NSURLEnvName, Value: v}),
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
@@ -177,11 +186,11 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 	return jsonpatch.NewOperation("add", path.Join(p, "initContainers"), initContainers)
 }
 
-func (s *admissionWebhookServer) createContainerPatch(p, v string, containers []corev1.Container) jsonpatch.JsonPatchOperation {
+func (s *admissionWebhookServer) createContainerPatch(p, v string, containers []corev1.Container, envs []corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	for _, img := range s.config.ContainerImages {
 		containers = append(containers, corev1.Container{
 			Name:            nameOf(img),
-			Env:             append(s.config.GetOrResolveEnvs(), corev1.EnvVar{Name: s.config.NSURLEnvName, Value: v}),
+			Env:             append(envs, corev1.EnvVar{Name: s.config.NSURLEnvName, Value: v}),
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
