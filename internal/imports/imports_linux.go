@@ -15,6 +15,7 @@ import (
 	_ "github.com/labstack/echo"
 	_ "github.com/labstack/echo/middleware"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/nsurl"
+	_ "github.com/sirupsen/logrus"
 	_ "go.uber.org/zap"
 	_ "gomodules.xyz/jsonpatch/v2"
 	_ "io/ioutil"

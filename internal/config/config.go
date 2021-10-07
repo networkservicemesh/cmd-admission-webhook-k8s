@@ -47,6 +47,7 @@ type Config struct {
 	CertFilePath        string   `desc:"Path to certificate" split_words:"true"`
 	KeyFilePath         string   `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
 	CABundleFilePath    string   `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
+	LogLevel            string   `default:"INFO" desc:"Log level" split_words:"true"`
 	envs                []corev1.EnvVar
 	caBundle            []byte
 	cert                tls.Certificate

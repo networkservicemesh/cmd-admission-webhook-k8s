@@ -33,6 +33,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -282,7 +283,7 @@ func main() {
 	if err = envconfig.Process("nsm", conf); err != nil {
 		prod.Fatal(err.Error())
 	}
-
+	setlLogLevel(conf.LogLevel)
 	var logger = prod.Sugar()
 
 	logger.Infof("config.Config: %#v", conf)
@@ -367,4 +368,12 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+func setlLogLevel(level string) {
+	l, err := logrus.ParseLevel(level)
+	if err != nil {
+		logrus.Fatalf("invalid log level %s", level)
+	}
+	logrus.SetLevel(l)
 }
