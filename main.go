@@ -283,7 +283,12 @@ func main() {
 	if err = envconfig.Process("nsm", conf); err != nil {
 		prod.Fatal(err.Error())
 	}
-	setlLogLevel(conf.LogLevel)
+	l, err := logrus.ParseLevel(conf.LogLevel)
+	if err != nil {
+		logrus.Fatalf("invalid log level %s", conf.LogLevel)
+	}
+	logrus.SetLevel(l)
+
 	var logger = prod.Sugar()
 
 	logger.Infof("config.Config: %#v", conf)
@@ -368,12 +373,4 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
-}
-
-func setlLogLevel(level string) {
-	l, err := logrus.ParseLevel(level)
-	if err != nil {
-		logrus.Fatalf("invalid log level %s", level)
-	}
-	logrus.SetLevel(l)
 }
