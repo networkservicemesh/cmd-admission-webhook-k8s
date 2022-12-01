@@ -66,7 +66,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 	}
 
 	s.logger.Infof("Incoming request: %+v", in)
-	defer s.logger.Infof("Outgoing response: %+v", resp)
+	defer logResponse(s.logger, resp)
 
 	if in.Operation != admissionv1.Create {
 		resp.Allowed = true
@@ -421,4 +421,16 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+// Logs the response to the review request. Since the patch part of
+// the response is important we handle it specially. If we just log
+// the AdmissionResponse without doing this then the patch gets dumped
+// as an array of bytes, which is extremely difficult to read. Like
+// this it's not exactly easy to read (because of all the backslashes)
+// but it's possible.
+func logResponse(logger *zap.SugaredLogger, response *admissionv1.AdmissionResponse) {
+	shallow := *response
+	shallow.Patch = []byte{} // ...so we don't get pages of numbers in the log
+	logger.Infof("Outgoing response: %+v Patch: %s", shallow, string(response.Patch))
 }
