@@ -6,7 +6,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/networkservicemesh/sdk v0.5.1-0.20221206103812-b6979bfe147d
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20221206232124-a44ae6cddbad
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20221206233229-0bd1359737d9
 	go.uber.org/zap v1.16.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.25.4
@@ -69,7 +69,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/term v0.2.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220908141613-51c1cc9bc6d0 // indirect
