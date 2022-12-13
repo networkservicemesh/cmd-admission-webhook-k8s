@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
-	github.com/networkservicemesh/sdk v0.5.1-0.20221208093337-7c7f3b0c7fd8
+	github.com/networkservicemesh/sdk v0.5.1-0.20221213182556-bb4ba1aaa7e3
 	github.com/networkservicemesh/sdk-k8s v0.0.0-20221208094841-4b317b145453
 	go.uber.org/zap v1.16.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
