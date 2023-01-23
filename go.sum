@@ -206,8 +206,8 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/networkservicemesh/api v1.6.2-0.20221205183940-84c7ff837cdd h1:26HR90HrJFZHIPPP3SCLGNRpPCMFoEnSSZfhHH8MPSo=
 github.com/networkservicemesh/api v1.6.2-0.20221205183940-84c7ff837cdd/go.mod h1:hOF2844BSstH1311oDMDgqqXS+kdc77htZNPRKl9mf8=
-github.com/networkservicemesh/sdk v0.5.1-0.20230117143815-57af8274d643 h1:+huWTPlgzFRLXQSFCQcIFujep8xaBThr1Gc6igJMV1Q=
-github.com/networkservicemesh/sdk v0.5.1-0.20230117143815-57af8274d643/go.mod h1:++MSpR2wuFlCpCYoR6lELxJ4ILKd650vDQ8d9CtGAzA=
+github.com/networkservicemesh/sdk v0.5.1-0.20230123083201-661534af77d7 h1:/1p9CnLLOncgd584C8DyQ74j+j0Z3nxP69GeZojnRQ8=
+github.com/networkservicemesh/sdk v0.5.1-0.20230123083201-661534af77d7/go.mod h1:++MSpR2wuFlCpCYoR6lELxJ4ILKd650vDQ8d9CtGAzA=
 github.com/networkservicemesh/sdk-k8s v0.0.0-20230117144527-c4b85254e513 h1:m1W4W0rxU4ZFoCP1EwFxBtqoKeTXTK6gMSLQqQ0DoM4=
 github.com/networkservicemesh/sdk-k8s v0.0.0-20230117144527-c4b85254e513/go.mod h1:0ZgQXSRFKbQur4Q8WsubI0C8pE/FN3IjDEinNFCTALs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
