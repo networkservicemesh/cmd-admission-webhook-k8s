@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
-	github.com/networkservicemesh/sdk v0.5.1-0.20230123083201-661534af77d7
+	github.com/networkservicemesh/sdk v0.5.1-0.20230124094906-637ce7074f92
 	github.com/networkservicemesh/sdk-k8s v0.0.0-20230117144527-c4b85254e513
 	go.uber.org/zap v1.16.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
@@ -46,7 +46,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/networkservicemesh/api v1.6.2-0.20221205183940-84c7ff837cdd // indirect
+	github.com/networkservicemesh/api v1.7.2-0.20230123083145-4a6c3ec589e1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
