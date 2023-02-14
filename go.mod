@@ -6,7 +6,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/networkservicemesh/sdk v0.5.1-0.20230214013943-438ec051e69b
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20230213140706-4b1965b28f51
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20230214093953-233b1ac6214a
 	go.uber.org/zap v1.16.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.25.4
