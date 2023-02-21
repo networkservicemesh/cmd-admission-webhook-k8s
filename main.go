@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2022 Doc.ai and/or its affiliates.
 //
+// Copyright (c) 2023 Cisco and/or its affiliates.
+//
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -402,9 +404,9 @@ func main() {
 	go func() {
 		var certs = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
 
+		// #nosec
 		var server = &http.Server{
 			Addr: ":443",
-			// #nosec
 			TLSConfig: &tls.Config{
 				Certificates: certs,
 				MinVersion:   tls.VersionTLS12,
