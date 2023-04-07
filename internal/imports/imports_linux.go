@@ -11,6 +11,7 @@ import (
 	_ "encoding/json"
 	_ "encoding/pem"
 	_ "fmt"
+	_ "github.com/google/uuid"
 	_ "github.com/kelseyhightower/envconfig"
 	_ "github.com/labstack/echo/v4"
 	_ "github.com/labstack/echo/v4/middleware"

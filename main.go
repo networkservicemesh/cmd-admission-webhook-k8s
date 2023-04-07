@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022 Doc.ai and/or its affiliates.
+// Copyright (c) 2021-2023 Doc.ai and/or its affiliates.
 //
 // Copyright (c) 2023 Cisco and/or its affiliates.
 //
@@ -109,7 +109,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 		envVars := []corev1.EnvVar{{Name: s.config.NSURLEnvName, Value: annotation}, {Name: s.config.ClientIDEnvName, Value: clientID}}
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
 			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
-			s.createContainerPatch(p, annotation, spec.Containers, envVars...),
+			s.createContainerPatch(p, spec.Containers, envVars...),
 			s.createVolumesPatch(p, spec.Volumes),
 			s.createLabelPatch(p, podMetaPtr.Labels),
 		})
@@ -262,7 +262,7 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 	return jsonpatch.NewOperation("add", path.Join(p, "spec", "initContainers"), initContainers)
 }
 
-func (s *admissionWebhookServer) createContainerPatch(p, v string, containers []corev1.Container, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
+func (s *admissionWebhookServer) createContainerPatch(p string, containers []corev1.Container, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	for _, img := range s.config.ContainerImages {
 		containers = append(containers, corev1.Container{
 			Name:            nameOf(img),
