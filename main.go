@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -106,7 +107,10 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 
 	if annotation != "" {
 		clientID := uuid.NewString()
-		envVars := []corev1.EnvVar{{Name: s.config.NSURLEnvName, Value: annotation}, {Name: "NSM_NAME", Value: "$(NSM_NAME)-" + clientID}}
+		envVars := append(s.config.GetOrResolveEnvs(),
+			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
+			corev1.EnvVar{Name: "NSM_NAME", Value: fmt.Sprintf("%v-%v", podMetaPtr.Name, clientID)})
+
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
 			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
 			s.createContainerPatch(p, spec.Containers, envVars...),
@@ -252,7 +256,7 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 	for _, img := range s.config.InitContainerImages {
 		initContainers = append(initContainers, corev1.Container{
 			Name:            nameOf(img),
-			Env:             append(s.config.GetOrResolveEnvs(), envVars...),
+			Env:             envVars,
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
@@ -266,7 +270,7 @@ func (s *admissionWebhookServer) createContainerPatch(p string, containers []cor
 	for _, img := range s.config.ContainerImages {
 		containers = append(containers, corev1.Container{
 			Name:            nameOf(img),
-			Env:             append(s.config.GetOrResolveEnvs(), envVars...),
+			Env:             envVars,
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
