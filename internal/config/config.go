@@ -1,4 +1,6 @@
-// Copyright (c) 2021-2022 Doc.ai and/or its affiliates.
+// Copyright (c) 2021-2023 Doc.ai and/or its affiliates.
+//
+// Copyright (c) 2023 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -130,10 +132,10 @@ func (c *Config) initializeCert() {
 		}
 		c.cert = cert
 	}
-	c.cert = c.selfSignedInMemoryCertificeate()
+	c.cert = c.selfSignedInMemoryCertificate()
 }
 
-func (c *Config) selfSignedInMemoryCertificeate() tls.Certificate {
+func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {
 	now := time.Now()
 
 	template := &x509.Certificate{
