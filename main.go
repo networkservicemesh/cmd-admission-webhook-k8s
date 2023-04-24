@@ -106,7 +106,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 
 	if annotation != "" {
 		clientID := uuid.NewString()
-		envVars := []corev1.EnvVar{{Name: s.config.NSURLEnvName, Value: annotation}, {Name: s.config.ClientIDEnvName, Value: clientID}}
+		envVars := []corev1.EnvVar{{Name: s.config.NSURLEnvName, Value: annotation}, {Name: "NSM_NAME", Value: "$(NSM_NAME)-" + clientID}}
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
 			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
 			s.createContainerPatch(p, spec.Containers, envVars...),
