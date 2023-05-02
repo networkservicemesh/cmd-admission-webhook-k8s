@@ -95,14 +95,6 @@ func (c *Config) initializeEnvs() {
 			Value: "unix:///run/spire/sockets/agent.sock",
 		},
 		corev1.EnvVar{
-			Name: "NSM_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		},
-		corev1.EnvVar{
 			Name: "POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
