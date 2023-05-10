@@ -109,7 +109,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 		clientID := uuid.NewString()
 		envVars := append(s.config.GetOrResolveEnvs(),
 			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
-			corev1.EnvVar{Name: "NSM_NAME", Value: fmt.Sprintf("%v-%v", podMetaPtr.Name, clientID)})
+			corev1.EnvVar{Name: "NSM_NAME", Value: fmt.Sprintf("$(POD_NAME)-%v", clientID)})
 
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
 			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
