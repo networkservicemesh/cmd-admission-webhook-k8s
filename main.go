@@ -106,10 +106,14 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 	}
 
 	if annotation != "" {
-		clientID := uuid.NewString()
+		nsmNameEnv := corev1.EnvVar{Name: "NSM_NAME", Value: "$(POD_NAME)"}
+		if podMetaPtr.GenerateName == "" {
+			clientID := uuid.NewString()
+			nsmNameEnv.Value = fmt.Sprintf("$(POD_NAME)-%v", clientID)
+		}
 		envVars := append(s.config.GetOrResolveEnvs(),
 			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
-			corev1.EnvVar{Name: "NSM_NAME", Value: fmt.Sprintf("$(POD_NAME)-%v", clientID)})
+			nsmNameEnv)
 
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
 			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
