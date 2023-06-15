@@ -206,27 +206,51 @@ func (s *admissionWebhookServer) postProcessPodMeta(podMetaPtr, metaPtr *v1.Obje
 }
 
 func (s *admissionWebhookServer) createVolumesPatch(p string, volumes []corev1.Volume) jsonpatch.JsonPatchOperation {
-	hostPathDir := corev1.HostPathDirectory
-	volumes = append(volumes,
-		corev1.Volume{
-			Name: "spire-agent-socket",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/spire/sockets",
-					Type: &hostPathDir,
+	if s.config.UseCSI {
+		readOnly := true
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "spire-agent-socket",
+				VolumeSource: corev1.VolumeSource{
+					CSI: &corev1.CSIVolumeSource{
+						Driver:   "csi.spiffe.io",
+						ReadOnly: &readOnly,
+					},
 				},
 			},
-		},
-		corev1.Volume{
-			Name: "nsm-socket",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/lib/networkservicemesh",
-					Type: &hostPathDir,
+			corev1.Volume{
+				Name: "nsm-socket",
+				VolumeSource: corev1.VolumeSource{
+					CSI: &corev1.CSIVolumeSource{
+						Driver:   "csi.networkservicemesh.io",
+						ReadOnly: &readOnly,
+					},
 				},
 			},
-		},
-	)
+		)
+	} else {
+		hostPathDir := corev1.HostPathDirectory
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "spire-agent-socket",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/run/spire/sockets",
+						Type: &hostPathDir,
+					},
+				},
+			},
+			corev1.Volume{
+				Name: "nsm-socket",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/var/lib/networkservicemesh",
+						Type: &hostPathDir,
+					},
+				},
+			},
+		)
+	}
 	return jsonpatch.NewOperation("add", path.Join(p, "spec", "volumes"), volumes)
 }
 
