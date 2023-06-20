@@ -27,8 +27,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -51,7 +51,6 @@ type Config struct {
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
-	UseCSI                bool              `default:"false" desc:"Use CSI volume instead of hostPath" split_words:"true"`
 	envs                  []corev1.EnvVar
 	caBundle              []byte
 	cert                  tls.Certificate
@@ -110,7 +109,7 @@ func (c *Config) initializeCABundle() {
 	if len(c.caBundle) != 0 {
 		return
 	}
-	r, err := ioutil.ReadFile(c.CABundleFilePath)
+	r, err := os.ReadFile(c.CABundleFilePath)
 	if err != nil {
 		panic(err.Error())
 	}
