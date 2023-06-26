@@ -298,7 +298,6 @@ func parseResources(v string, logger *zap.SugaredLogger) map[string]int {
 
 func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initContainers []corev1.Container, psaLevel psa.Level, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	poolResources := parseResources(v, s.logger)
-	allowPrivilegeEscalation := false
 	for _, img := range s.config.InitContainerImages {
 		initContainers = append(initContainers, corev1.Container{
 			Name:            nameOf(img),
@@ -311,6 +310,7 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
+			allowPrivilegeEscalation := false
 			initContainers[len(initContainers)-1].SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
@@ -324,23 +324,17 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 
 func (s *admissionWebhookServer) createContainerPatch(p string, containers []corev1.Container, psaLevel psa.Level, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	for _, img := range s.config.ContainerImages {
-		allowPrivilegeEscalation := false
 		containers = append(containers, corev1.Container{
 			Name:            nameOf(img),
 			Env:             envVars,
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
-			SecurityContext: &corev1.SecurityContext{
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-			},
 		})
 		s.addVolumeMounts(&containers[len(containers)-1])
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
+			allowPrivilegeEscalation := false
 			containers[len(containers)-1].SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
