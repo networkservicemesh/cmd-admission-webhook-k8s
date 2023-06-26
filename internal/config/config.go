@@ -27,8 +27,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -109,7 +109,7 @@ func (c *Config) initializeCABundle() {
 	if len(c.caBundle) != 0 {
 		return
 	}
-	r, err := ioutil.ReadFile(c.CABundleFilePath)
+	r, err := os.ReadFile(c.CABundleFilePath)
 	if err != nil {
 		panic(err.Error())
 	}

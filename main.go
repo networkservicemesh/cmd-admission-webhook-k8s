@@ -23,7 +23,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
+	psa "k8s.io/pod-security-admission/api"
 
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/k8s"
@@ -69,7 +70,10 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 		UID: in.UID,
 	}
 
-	s.logger.Infof("Incoming request: %+v", in)
+	// CWE-117
+	escapedIn := strings.ReplaceAll(in.String(), "\n", "")
+	escapedIn = strings.ReplaceAll(escapedIn, "\r", "")
+	s.logger.Infof("Incoming request: %v", escapedIn)
 	defer logResponse(s.logger, resp)
 
 	if in.Operation != admissionv1.Create {
@@ -83,6 +87,13 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 	}
 	p = path.Join("/", p)
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	namespace, err := s.clientset.CoreV1().Namespaces().Get(timeoutCtx, in.Namespace, v1.GetOptions{})
+	if err != nil {
+		s.logger.Errorf("failed to get namespace by name: %v", err)
+	}
+
 	if spec == nil && podMetaPtr == nil {
 		resp.Allowed = true
 		return resp
@@ -94,14 +105,8 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 		return resp
 	}
 
-	// use namespace annotation only if resource doesn't have it's own
-	if annotation == "" && in.Kind.Kind == "Pod" {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
-		defer cancel()
-		namespace, err := s.clientset.CoreV1().Namespaces().Get(timeoutCtx, in.Namespace, v1.GetOptions{})
-		if err != nil {
-			s.logger.Errorf("failed to get namespace by name", err)
-		}
+	// use namespace annotation only if resource doesn't have its own
+	if annotation == "" && in.Kind.Kind == "Pod" && namespace != nil {
 		annotation = namespace.Annotations[s.config.Annotation]
 	}
 
@@ -115,10 +120,11 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
 			nsmNameEnv)
 
+		psaLevel := psaLevelByNamespace(namespace)
 		bytes, err := json.Marshal([]jsonpatch.JsonPatchOperation{
-			s.createInitContainerPatch(p, annotation, spec.InitContainers, envVars...),
-			s.createContainerPatch(p, spec.Containers, envVars...),
-			s.createVolumesPatch(p, spec.Volumes),
+			s.createInitContainerPatch(p, annotation, spec.InitContainers, psaLevel, envVars...),
+			s.createContainerPatch(p, spec.Containers, psaLevel, envVars...),
+			s.createVolumesPatch(p, spec.Volumes, psaLevel),
 			s.createLabelPatch(p, podMetaPtr.Labels),
 		})
 		if err != nil {
@@ -134,6 +140,17 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 
 	resp.Allowed = true
 	return resp
+}
+
+func psaLevelByNamespace(namespace *corev1.Namespace) psa.Level {
+	if namespace == nil {
+		return psa.LevelPrivileged
+	}
+	level, err := psa.ParseLevel(namespace.Labels[psa.EnforceLevelLabel])
+	if err != nil {
+		return psa.LevelPrivileged
+	}
+	return level
 }
 
 func (s *admissionWebhookServer) unmarshal(in *admissionv1.AdmissionRequest) (podMetaPtr *v1.ObjectMeta, podSpec *corev1.PodSpec) {
@@ -205,28 +222,52 @@ func (s *admissionWebhookServer) postProcessPodMeta(podMetaPtr, metaPtr *v1.Obje
 	return podMetaPtr
 }
 
-func (s *admissionWebhookServer) createVolumesPatch(p string, volumes []corev1.Volume) jsonpatch.JsonPatchOperation {
-	hostPathDir := corev1.HostPathDirectory
-	volumes = append(volumes,
-		corev1.Volume{
-			Name: "spire-agent-socket",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/spire/sockets",
-					Type: &hostPathDir,
+func (s *admissionWebhookServer) createVolumesPatch(p string, volumes []corev1.Volume, psaLevel psa.Level) jsonpatch.JsonPatchOperation {
+	if psaLevel != psa.LevelPrivileged {
+		readOnly := true
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "spire-agent-socket",
+				VolumeSource: corev1.VolumeSource{
+					CSI: &corev1.CSIVolumeSource{
+						Driver:   "csi.spiffe.io",
+						ReadOnly: &readOnly,
+					},
 				},
 			},
-		},
-		corev1.Volume{
-			Name: "nsm-socket",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/lib/networkservicemesh",
-					Type: &hostPathDir,
+			corev1.Volume{
+				Name: "nsm-socket",
+				VolumeSource: corev1.VolumeSource{
+					CSI: &corev1.CSIVolumeSource{
+						Driver:   "csi.networkservicemesh.io",
+						ReadOnly: &readOnly,
+					},
 				},
 			},
-		},
-	)
+		)
+	} else {
+		hostPathDir := corev1.HostPathDirectory
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "spire-agent-socket",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/run/spire/sockets",
+						Type: &hostPathDir,
+					},
+				},
+			},
+			corev1.Volume{
+				Name: "nsm-socket",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/var/lib/networkservicemesh",
+						Type: &hostPathDir,
+					},
+				},
+			},
+		)
+	}
 	return jsonpatch.NewOperation("add", path.Join(p, "spec", "volumes"), volumes)
 }
 
@@ -255,8 +296,9 @@ func parseResources(v string, logger *zap.SugaredLogger) map[string]int {
 	return poolResources
 }
 
-func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initContainers []corev1.Container, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
+func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initContainers []corev1.Container, psaLevel psa.Level, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	poolResources := parseResources(v, s.logger)
+	allowPrivilegeEscalation := false
 	for _, img := range s.config.InitContainerImages {
 		initContainers = append(initContainers, corev1.Container{
 			Name:            nameOf(img),
@@ -266,19 +308,46 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 		})
 		s.addVolumeMounts(&initContainers[len(initContainers)-1])
 		s.addResources(&initContainers[len(initContainers)-1], poolResources)
+
+		// SecurityContext is required by the k8s restricted policy
+		if psaLevel == psa.LevelRestricted {
+			initContainers[len(initContainers)-1].SecurityContext = &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			}
+		}
 	}
 	return jsonpatch.NewOperation("add", path.Join(p, "spec", "initContainers"), initContainers)
 }
 
-func (s *admissionWebhookServer) createContainerPatch(p string, containers []corev1.Container, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
+func (s *admissionWebhookServer) createContainerPatch(p string, containers []corev1.Container, psaLevel psa.Level, envVars ...corev1.EnvVar) jsonpatch.JsonPatchOperation {
 	for _, img := range s.config.ContainerImages {
+		allowPrivilegeEscalation := false
 		containers = append(containers, corev1.Container{
 			Name:            nameOf(img),
 			Env:             envVars,
 			Image:           img,
 			ImagePullPolicy: corev1.PullIfNotPresent,
+			SecurityContext: &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			},
 		})
 		s.addVolumeMounts(&containers[len(containers)-1])
+
+		// SecurityContext is required by the k8s restricted policy
+		if psaLevel == psa.LevelRestricted {
+			containers[len(containers)-1].SecurityContext = &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			}
+		}
 	}
 	return jsonpatch.NewOperation("add", path.Join(p, "spec", "containers"), containers)
 }
@@ -388,7 +457,7 @@ func main() {
 	}
 
 	s.POST("/mutate", func(c echo.Context) error {
-		msg, err := ioutil.ReadAll(c.Request().Body)
+		msg, err := io.ReadAll(c.Request().Body)
 		if err != nil {
 			return err
 		}
