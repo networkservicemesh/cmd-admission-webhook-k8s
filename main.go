@@ -369,7 +369,7 @@ func (s *admissionWebhookServer) addNscInitLimits(c *corev1.Container) {
 	s.createResourcesLimits(c, s.config.NscInitLimitsCPU, s.config.NscInitRequestsCPU, s.config.NscInitLimitsMemory, s.config.NscInitRequestsMemory)
 }
 
-func (s *admissionWebhookServer) createResourcesLimits(c *corev1.Container, limitsCPU string, requestsCPU string, limitsMemory string, requestsMemory string) {
+func (s *admissionWebhookServer) createResourcesLimits(c *corev1.Container, limitsCPU, requestsCPU, limitsMemory, requestsMemory string) {
 	c.Resources = corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			"cpu":    resource.MustParse(limitsCPU),
