@@ -307,7 +307,7 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 		})
 		s.addVolumeMounts(&initContainers[len(initContainers)-1])
 		s.addResources(&initContainers[len(initContainers)-1], poolResources)
-		s.addNscInitLimits(&initContainers[len(initContainers)-1])
+		s.addResourcesLimits(&initContainers[len(initContainers)-1], s.config.SidecarLimitsCPU, s.config.SidecarRequestsCPU, s.config.SidecarLimitsMemory, s.config.SidecarRequestsMemory)
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
@@ -332,7 +332,7 @@ func (s *admissionWebhookServer) createContainerPatch(p string, containers []cor
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
 		s.addVolumeMounts(&containers[len(containers)-1])
-		s.addNscLimits(&containers[len(containers)-1])
+		s.addResourcesLimits(&containers[len(containers)-1], s.config.ContainerLimitsCPU, s.config.ContainerRequestsCPU, s.config.ContainerLimitsMemory, s.config.ContainerRequestsMemory)
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
@@ -361,15 +361,7 @@ func (s *admissionWebhookServer) addResources(c *corev1.Container, r map[string]
 	}
 }
 
-func (s *admissionWebhookServer) addNscLimits(c *corev1.Container) {
-	s.createResourcesLimits(c, s.config.NscLimitsCPU, s.config.NscRequestsCPU, s.config.NscLimitsMemory, s.config.NscRequestsMemory)
-}
-
-func (s *admissionWebhookServer) addNscInitLimits(c *corev1.Container) {
-	s.createResourcesLimits(c, s.config.NscInitLimitsCPU, s.config.NscInitRequestsCPU, s.config.NscInitLimitsMemory, s.config.NscInitRequestsMemory)
-}
-
-func (s *admissionWebhookServer) createResourcesLimits(c *corev1.Container, limitsCPU, requestsCPU, limitsMemory, requestsMemory string) {
+func (s *admissionWebhookServer) addResourcesLimits(c *corev1.Container, limitsCPU, requestsCPU, limitsMemory, requestsMemory string) {
 	c.Resources = corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			"cpu":    resource.MustParse(limitsCPU),
