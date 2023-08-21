@@ -307,7 +307,7 @@ func (s *admissionWebhookServer) createInitContainerPatch(p, v string, initConta
 		})
 		s.addVolumeMounts(&initContainers[len(initContainers)-1])
 		s.addResources(&initContainers[len(initContainers)-1], poolResources)
-		s.addResourcesLimits(&initContainers[len(initContainers)-1], s.config.SidecarLimitsCPU, s.config.SidecarRequestsCPU, s.config.SidecarLimitsMemory, s.config.SidecarRequestsMemory)
+		s.addResourcesLimits(&initContainers[len(initContainers)-1])
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
@@ -332,7 +332,7 @@ func (s *admissionWebhookServer) createContainerPatch(p string, containers []cor
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		})
 		s.addVolumeMounts(&containers[len(containers)-1])
-		s.addResourcesLimits(&containers[len(containers)-1], s.config.ContainerLimitsCPU, s.config.ContainerRequestsCPU, s.config.ContainerLimitsMemory, s.config.ContainerRequestsMemory)
+		s.addResourcesLimits(&containers[len(containers)-1])
 
 		// SecurityContext is required by the k8s restricted policy
 		if psaLevel == psa.LevelRestricted {
@@ -361,15 +361,15 @@ func (s *admissionWebhookServer) addResources(c *corev1.Container, r map[string]
 	}
 }
 
-func (s *admissionWebhookServer) addResourcesLimits(c *corev1.Container, limitsCPU, requestsCPU, limitsMemory, requestsMemory string) {
+func (s *admissionWebhookServer) addResourcesLimits(c *corev1.Container) {
 	c.Resources = corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(limitsCPU),
-			"memory": resource.MustParse(limitsMemory),
+			"cpu":    resource.MustParse(s.config.SidecarLimitsCPU),
+			"memory": resource.MustParse(s.config.SidecarLimitsMemory),
 		},
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(requestsCPU),
-			"memory": resource.MustParse(requestsMemory),
+			"cpu":    resource.MustParse(s.config.SidecarRequestsCPU),
+			"memory": resource.MustParse(s.config.SidecarRequestsMemory),
 		},
 	}
 }
