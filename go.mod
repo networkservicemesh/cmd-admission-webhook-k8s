@@ -6,7 +6,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/networkservicemesh/sdk v0.5.1-0.20230928095228-256d2ccfaf72
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20230919044941-eae83db21370
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20230928141340-a06239569412
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.28.2
@@ -24,7 +24,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
+	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.42.0-rc.1 // indirect
