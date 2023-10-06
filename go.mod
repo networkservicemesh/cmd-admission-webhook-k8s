@@ -5,8 +5,8 @@ go 1.20
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.6.1
-	github.com/networkservicemesh/sdk v0.5.1-0.20231005102834-7ad780b13635
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20231002110307-5f8fc223e31a
+	github.com/networkservicemesh/sdk v1.11.0
+	github.com/networkservicemesh/sdk-k8s v1.11.0
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.28.2
@@ -58,7 +58,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/networkservicemesh/api v1.10.1-0.20230822145124-c4a3ece88804 // indirect
+	github.com/networkservicemesh/api v1.11.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
