@@ -45,11 +45,6 @@ First, we need to create a Kubernetes cluster:
 ```
 ❯ kubectl exec -n spire spire-server-0 --  /opt/spire/bin/spire-server entry show
 ```
-to remove if needed
-```
-❯ kubectl exec -n spire spire-server-0 --  /opt/spire/bin/spire-server entry delete -entryID ${ID}
-```
-
 
 ### Apply Webhook configs
 ```
