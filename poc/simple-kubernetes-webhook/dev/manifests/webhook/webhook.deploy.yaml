@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: simple-kubernetes-webhook
+  name: simple-kubernetes-webhook
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-kubernetes-webhook
+  template:
+    metadata:
+      labels:
+        app: simple-kubernetes-webhook
+        "spiffe.io/spiffe-id": "true"
+    spec:
+      tolerations:
+        - key: acme.com/lifespan-remaining
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - image: simple-kubernetes-webhook:latest
+          imagePullPolicy: Never
+          name: simple-kubernetes-webhook
+          env:
+            - name: TLS
+              value: "true"
+            - name: LOG_LEVEL
+              value: "trace"
+            - name: LOG_JSON
+              value: "false"
+          volumeMounts:
+            - name: spire-agent-socket
+              mountPath: /run/spire/sockets
+              readOnly: true
+            - name: webhook-certs
+              mountPath: /etc/webhook/certs
+      volumes:
+        - name: spire-agent-socket
+          hostPath:
+            path: /run/spire/sockets
+            type: Directory
+        - name: webhook-certs
+          emptyDir: {}
