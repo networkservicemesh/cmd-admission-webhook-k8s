@@ -1,0 +1,65 @@
+---
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: my-workloads
+spec:
+  spiffeIDTemplate: "spiffe://example.org/ns/{{.PodMeta.Namespace}}/pod/{{.PodMeta.Name}}"
+  podSelector:
+    matchLabels:
+      "spiffe.io/spiffe-id": "true"
+
+Entry ID         : a173e1c6-5251-4310-a8ab-6883fb9ae2ee
+SPIFFE ID        : spiffe://example.org/ns/default/pod/simple-kubernetes-webhook-fdc94c788-hcc29
+Parent ID        : spiffe://example.org/spire/agent/k8s_psat/example/50cc5869-6de6-4b73-8e02-3df64cf2211f
+Revision         : 0
+X509-SVID TTL    : default
+JWT-SVID TTL     : default
+Selector         : k8s:pod-uid:f2353aa1-5d55-4992-8729-4b97eee6bbb0
+
+******************
+
+---
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: my-workloads
+spec:
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ns/{{.PodMeta.Namespace}}/pod/{{.PodMeta.Name}}"
+  dnsNameTemplates: ["{{ .PodMeta.Name }}.{{ .PodMeta.Namespace }}.svc"]
+  podSelector:
+    matchLabels:
+      "spiffe.io/spiffe-id": "true"
+
+Entry ID         : 3638bf28-ec38-48a1-92cb-706917594d3f
+SPIFFE ID        : spiffe://example.org/ns/default/pod/simple-kubernetes-webhook-fdc94c788-kjq7l
+Parent ID        : spiffe://example.org/spire/agent/k8s_psat/example/e49f294e-427b-4b39-a3d6-dec0f6b01b8f
+Revision         : 0
+X509-SVID TTL    : default
+JWT-SVID TTL     : default
+Selector         : k8s:pod-uid:48a372df-6f20-403a-8bbc-67ef221ff8d3
+DNS name         : simple-kubernetes-webhook-fdc94c788-kjq7l.default.svc
+
+*****************
+
+Entry ID         : 1e741294-f751-4d3b-84d3-ae53f13ffc76
+SPIFFE ID        : spiffe://example.org/ns/spire/sa/spire-agent
+Parent ID        : spiffe://example.org/spire/server
+Revision         : 0
+X509-SVID TTL    : default
+JWT-SVID TTL     : default
+Selector         : k8s_sat:agent_ns:spire
+Selector         : k8s_sat:agent_sa:spire-agent
+Selector         : k8s_sat:cluster:demo-cluster
+
+Entry ID         : 05759006-7e56-4d0d-93e3-936873812c82
+SPIFFE ID        : spiffe://example.org/ns/default/sa/default
+Parent ID        : spiffe://example.org/ns/spire/sa/spire-agent
+Revision         : 0
+X509-SVID TTL    : default
+JWT-SVID TTL     : default
+Selector         : k8s:ns:default
+Selector         : k8s:sa:default
+DNS name         : simple-kubernetes-webhook.default.svc
+
+****************

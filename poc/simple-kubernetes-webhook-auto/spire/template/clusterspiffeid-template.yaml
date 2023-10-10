@@ -1,0 +1,11 @@
+---
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: spiffe-id
+spec:
+  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ns/{{.PodMeta.Namespace}}/pod/{{.PodMeta.Name}}"
+  dnsNameTemplates: ["simple-kubernetes-webhook.{{ .PodMeta.Namespace }}.svc"]
+  podSelector:
+    matchLabels:
+      "spiffe.io/spiffe-id": "true"
