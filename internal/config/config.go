@@ -63,6 +63,7 @@ type Config struct {
 	once                  sync.Once
 }
 
+// ModeAuto allows you to use an automatically generated configuration and certificate.
 const (
 	ModeAuto = "AUTO"
 )

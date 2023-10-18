@@ -453,11 +453,7 @@ func main() {
 			_ = registerClient.Unregister(context.Background(), conf)
 		}()
 	} else {
-		logger.Infof("Obtaining X509 Certificate Source")
-		source, err = workloadapi.NewX509Source(ctx)
-		if err != nil {
-			logger.Fatalf("error getting x509 source: %+v", err)
-		}
+		source = getX509Source(ctx, logger)
 	}
 
 	s := echo.New()
@@ -503,18 +499,10 @@ func main() {
 
 	var startServerErr = make(chan error)
 	go func() {
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		}
-		if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
-			tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
-		} else {
-			tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
-		}
 		// #nosec
 		var server = &http.Server{
 			Addr:      ":443",
-			TLSConfig: tlsConfig,
+			TLSConfig: prepareTLSConfig(conf, source),
 		}
 		startServerErr <- s.StartServer(server)
 	}()
@@ -527,6 +515,28 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+func getX509Source(ctx context.Context, logger *zap.SugaredLogger) *workloadapi.X509Source {
+	logger.Infof("Obtaining X509 Certificate Source")
+	source, err := workloadapi.NewX509Source(ctx)
+	if err != nil {
+		logger.Fatalf("error getting x509 source: %+v", err)
+		return nil
+	}
+	return source
+}
+
+func prepareTLSConfig(conf *config.Config, source *workloadapi.X509Source) *tls.Config {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
+		tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
+	} else {
+		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+	}
+	return tlsConfig
 }
 
 // Logs the response to the review request. Since the patch part of
