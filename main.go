@@ -38,6 +38,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"go.uber.org/zap"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -435,18 +437,28 @@ func main() {
 		}()
 	}
 
-	var registerClient = k8s.AdmissionWebhookRegisterClient{
-		Logger: logger.Named("admissionWebhookRegisterClient"),
-	}
+	var source *workloadapi.X509Source
 
-	err = registerClient.Register(ctx, conf)
-	if err != nil {
-		prod.Fatal(err.Error())
-	}
+	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
+		var registerClient = k8s.AdmissionWebhookRegisterClient{
+			Logger: logger.Named("admissionWebhookRegisterClient"),
+		}
 
-	defer func() {
-		_ = registerClient.Unregister(context.Background(), conf)
-	}()
+		err = registerClient.Register(ctx, conf)
+		if err != nil {
+			prod.Fatal(err.Error())
+		}
+
+		defer func() {
+			_ = registerClient.Unregister(context.Background(), conf)
+		}()
+	} else {
+		logger.Infof("Obtaining X509 Certificate Source")
+		source, err = workloadapi.NewX509Source(ctx)
+		if err != nil {
+			logger.Fatalf("error getting x509 source: %+v", err)
+		}
+	}
 
 	s := echo.New()
 	s.Use(middleware.Logger())
@@ -491,15 +503,18 @@ func main() {
 
 	var startServerErr = make(chan error)
 	go func() {
-		var certs = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
-
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+		if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
+			tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
+		} else {
+			tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+		}
 		// #nosec
 		var server = &http.Server{
-			Addr: ":443",
-			TLSConfig: &tls.Config{
-				Certificates: certs,
-				MinVersion:   tls.VersionTLS12,
-			},
+			Addr:      ":443",
+			TLSConfig: tlsConfig,
 		}
 		startServerErr <- s.StartServer(server)
 	}()

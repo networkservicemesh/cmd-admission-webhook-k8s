@@ -47,6 +47,7 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
+	WebhookMode           string            `default:"manual" desc:"Set to 'auto' to use the automatically generated webhook configuration" split_words:"true"`
 	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
@@ -61,6 +62,10 @@ type Config struct {
 	cert                  tls.Certificate
 	once                  sync.Once
 }
+
+const (
+	ModeAuto = "AUTO"
+)
 
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
 func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
