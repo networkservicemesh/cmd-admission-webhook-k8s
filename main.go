@@ -440,15 +440,7 @@ func main() {
 	var source *workloadapi.X509Source
 
 	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
-		var registerClient = k8s.AdmissionWebhookRegisterClient{
-			Logger: logger.Named("admissionWebhookRegisterClient"),
-		}
-
-		err = registerClient.Register(ctx, conf)
-		if err != nil {
-			prod.Fatal(err.Error())
-		}
-
+		registerClient := registerClient(ctx, conf, logger)
 		defer func() {
 			_ = registerClient.Unregister(context.Background(), conf)
 		}()
@@ -515,6 +507,19 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+func registerClient(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) *k8s.AdmissionWebhookRegisterClient {
+	var registerClient = k8s.AdmissionWebhookRegisterClient{
+		Logger: logger.Named("admissionWebhookRegisterClient"),
+	}
+
+	err := registerClient.Register(ctx, conf)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+
+	return &registerClient
 }
 
 func getX509Source(ctx context.Context, logger *zap.SugaredLogger) *workloadapi.X509Source {
