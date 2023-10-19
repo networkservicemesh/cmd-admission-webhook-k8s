@@ -65,7 +65,8 @@ type Config struct {
 
 // ModeAuto allows you to use an automatically generated configuration and certificate.
 const (
-	ModeAuto = "AUTO"
+	ModeAuto   = "AUTO"
+	ModeManual = "MANUAL"
 )
 
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.

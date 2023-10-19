@@ -437,15 +437,11 @@ func main() {
 		}()
 	}
 
-	var source *workloadapi.X509Source
-
 	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
-		registerClient := registerClient(ctx, conf, logger)
+		unregister := registerSelf(ctx, conf, logger)
 		defer func() {
-			_ = registerClient.Unregister(context.Background(), conf)
+			_ = unregister(context.Background(), conf)
 		}()
-	} else {
-		source = getX509Source(ctx, logger)
 	}
 
 	s := echo.New()
@@ -490,11 +486,14 @@ func main() {
 	})
 
 	var startServerErr = make(chan error)
+
+	tlsConfig := prepareTLSConfig(ctx, conf, logger)
+
 	go func() {
 		// #nosec
 		var server = &http.Server{
 			Addr:      ":443",
-			TLSConfig: prepareTLSConfig(conf, source),
+			TLSConfig: tlsConfig,
 		}
 		startServerErr <- s.StartServer(server)
 	}()
@@ -509,7 +508,7 @@ func main() {
 	}
 }
 
-func registerClient(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) *k8s.AdmissionWebhookRegisterClient {
+func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
 	var registerClient = k8s.AdmissionWebhookRegisterClient{
 		Logger: logger.Named("admissionWebhookRegisterClient"),
 	}
@@ -519,28 +518,31 @@ func registerClient(ctx context.Context, conf *config.Config, logger *zap.Sugare
 		logger.Fatal(err.Error())
 	}
 
-	return &registerClient
+	return registerClient.Unregister
 }
 
-func getX509Source(ctx context.Context, logger *zap.SugaredLogger) *workloadapi.X509Source {
-	logger.Infof("Obtaining X509 Certificate Source")
-	source, err := workloadapi.NewX509Source(ctx)
-	if err != nil {
-		logger.Fatalf("error getting x509 source: %+v", err)
-		return nil
-	}
-	return source
-}
+func prepareTLSConfig(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) *tls.Config {
+	webhookMode := conf.WebhookMode
 
-func prepareTLSConfig(conf *config.Config, source *workloadapi.X509Source) *tls.Config {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
+
+	switch {
+	case strings.EqualFold(webhookMode, config.ModeAuto):
 		tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
-	} else {
+	case strings.EqualFold(webhookMode, config.ModeManual):
+		source, err := workloadapi.NewX509Source(ctx)
+		if err != nil {
+			logger.Fatalf("error getting x509 source: %v", err.Error())
+			return nil
+		}
 		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+	default:
+		logger.Fatalf("unknown webhook mode selected: %v", webhookMode)
+		return nil
 	}
+
 	return tlsConfig
 }
 
