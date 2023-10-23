@@ -47,7 +47,7 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	WebhookMode           string            `default:"manual" desc:"Set to 'auto' to use the automatically generated webhook configuration" split_words:"true"`
+	WebhookMode           string            `default:"spire" desc:"Set to 'selfsigned' to use the automatically generated webhook configuration" split_words:"true"`
 	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
@@ -63,11 +63,49 @@ type Config struct {
 	once                  sync.Once
 }
 
-// ModeAuto allows you to use an automatically generated configuration and certificate.
+// These are the different mode of webhook setup.
 const (
-	ModeAuto   = "AUTO"
-	ModeManual = "MANUAL"
+	// SelfsignedMode allows you to use an automatically generated webhook configuration and certificate
+	SelfsignedMode Mode = iota
+	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration
+	SpireMode
 )
+
+// Mode type
+type Mode uint32
+
+// ParseMode takes a string mode and returns the webhook Mode constant.
+func ParseMode(mode string) (Mode, error) {
+	switch strings.ToLower(mode) {
+	case "selfsigned":
+		return SelfsignedMode, nil
+	case "spire":
+		return SpireMode, nil
+	}
+
+	var m Mode
+	return m, fmt.Errorf("not a valid webhook mode: %q", mode)
+}
+
+func (mode Mode) marshalText() ([]byte, error) {
+	switch mode {
+	case SelfsignedMode:
+		return []byte("selfsigned"), nil
+	case SpireMode:
+		return []byte("spire"), nil
+	}
+
+	return nil, fmt.Errorf("not a valid webhook mode %d", mode)
+}
+
+// String convert the Mode to a string. E.g. SelfsignedMode becomes "selfsigned".
+func (mode Mode) String() string {
+	if m, err := mode.marshalText(); err == nil {
+		return string(m)
+	}
+
+	return "unknown"
+}
 
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
 func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {

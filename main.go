@@ -396,24 +396,11 @@ func (s *admissionWebhookServer) createLabelPatch(p string, v map[string]string)
 }
 
 func main() {
-	prod, err := zap.NewProduction()
-
+	prod, logger := getLoggers()
+	conf, err := prepareConfig()
 	if err != nil {
-		panic(err.Error())
-	}
-
-	var conf = new(config.Config)
-
-	if err = envconfig.Usage("nsm", conf); err != nil {
 		prod.Fatal(err.Error())
 	}
-
-	if err = envconfig.Process("nsm", conf); err != nil {
-		prod.Fatal(err.Error())
-	}
-
-	var logger = prod.Sugar()
-
 	logger.Infof("config.Config: %#v", conf)
 
 	ctx, cancel := signal.NotifyContext(context.Background(),
@@ -437,7 +424,12 @@ func main() {
 		}()
 	}
 
-	if strings.EqualFold(conf.WebhookMode, config.ModeAuto) {
+	mode, err := config.ParseMode(conf.WebhookMode)
+	if err != nil {
+		logger.Fatalf("unknown webhook mode selected: %v", err.Error())
+	}
+
+	if mode == config.SelfsignedMode {
 		unregister := registerSelf(ctx, conf, logger)
 		defer func() {
 			_ = unregister(context.Background(), conf)
@@ -487,7 +479,10 @@ func main() {
 
 	var startServerErr = make(chan error)
 
-	tlsConfig := prepareTLSConfig(ctx, conf, logger)
+	tlsConfig, err := prepareTLSConfig(ctx, conf, mode)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
 
 	go func() {
 		// #nosec
@@ -508,6 +503,31 @@ func main() {
 	}
 }
 
+func getLoggers() (*zap.Logger, *zap.SugaredLogger) {
+	prod, err := zap.NewProduction()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	logger := prod.Sugar()
+
+	return prod, logger
+}
+
+func prepareConfig() (*config.Config, error) {
+	conf := new(config.Config)
+
+	if err := envconfig.Usage("nsm", conf); err != nil {
+		return nil, err
+	}
+
+	if err := envconfig.Process("nsm", conf); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
+}
+
 func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
 	var registerClient = k8s.AdmissionWebhookRegisterClient{
 		Logger: logger.Named("admissionWebhookRegisterClient"),
@@ -521,29 +541,25 @@ func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredL
 	return registerClient.Unregister
 }
 
-func prepareTLSConfig(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) *tls.Config {
-	webhookMode := conf.WebhookMode
-
+func prepareTLSConfig(ctx context.Context, conf *config.Config, mode config.Mode) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 
-	switch {
-	case strings.EqualFold(webhookMode, config.ModeAuto):
+	switch mode {
+	case config.SelfsignedMode:
 		tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
-	case strings.EqualFold(webhookMode, config.ModeManual):
+	case config.SpireMode:
 		source, err := workloadapi.NewX509Source(ctx)
 		if err != nil {
-			logger.Fatalf("error getting x509 source: %v", err.Error())
-			return nil
+			return nil, fmt.Errorf("error getting x509 source: %v", err.Error())
 		}
 		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
 	default:
-		logger.Fatalf("unknown webhook mode selected: %v", webhookMode)
-		return nil
+		return nil, fmt.Errorf("mode is not supported: %v", mode.String())
 	}
 
-	return tlsConfig
+	return tlsConfig, nil
 }
 
 // Logs the response to the review request. Since the patch part of
