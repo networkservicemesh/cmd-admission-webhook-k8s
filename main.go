@@ -38,6 +38,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"go.uber.org/zap"
@@ -540,11 +541,11 @@ func prepareTLSConfig(ctx context.Context, conf *config.Config, mode config.Mode
 	case config.SpireMode:
 		source, err := workloadapi.NewX509Source(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error getting x509 source: %v", err.Error())
+			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
 		}
 		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
 	default:
-		return nil, fmt.Errorf("mode is not supported: %v", mode.String())
+		return nil, errors.Errorf("mode is not supported: %v", mode.String())
 	}
 
 	return tlsConfig, nil

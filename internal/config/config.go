@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -84,7 +85,7 @@ func ParseMode(mode string) (Mode, error) {
 	}
 
 	var m Mode
-	return m, fmt.Errorf("not a valid webhook mode: %q", mode)
+	return m, errors.Errorf("not a valid webhook mode: %q", mode)
 }
 
 func (mode Mode) marshalText() ([]byte, error) {
@@ -95,7 +96,7 @@ func (mode Mode) marshalText() ([]byte, error) {
 		return []byte("spire"), nil
 	}
 
-	return nil, fmt.Errorf("not a valid webhook mode %d", mode)
+	return nil, errors.Errorf("not a valid webhook mode %d", mode)
 }
 
 // String convert the Mode to a string. E.g. SelfsignedMode becomes "selfsigned".
