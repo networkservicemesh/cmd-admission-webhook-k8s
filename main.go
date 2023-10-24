@@ -396,11 +396,24 @@ func (s *admissionWebhookServer) createLabelPatch(p string, v map[string]string)
 }
 
 func main() {
-	prod, logger := getLoggers()
-	conf, err := prepareConfig()
+	prod, err := zap.NewProduction()
+
 	if err != nil {
+		panic(err.Error())
+	}
+
+	var conf = new(config.Config)
+
+	if err = envconfig.Usage("nsm", conf); err != nil {
 		prod.Fatal(err.Error())
 	}
+
+	if err = envconfig.Process("nsm", conf); err != nil {
+		prod.Fatal(err.Error())
+	}
+
+	var logger = prod.Sugar()
+
 	logger.Infof("config.Config: %#v", conf)
 
 	ctx, cancel := signal.NotifyContext(context.Background(),
@@ -434,6 +447,11 @@ func main() {
 		defer func() {
 			_ = unregister(context.Background(), conf)
 		}()
+	}
+
+	tlsConfig, err := prepareTLSConfig(ctx, conf, mode)
+	if err != nil {
+		logger.Fatal(err.Error())
 	}
 
 	s := echo.New()
@@ -479,11 +497,6 @@ func main() {
 
 	var startServerErr = make(chan error)
 
-	tlsConfig, err := prepareTLSConfig(ctx, conf, mode)
-	if err != nil {
-		logger.Fatal(err.Error())
-	}
-
 	go func() {
 		// #nosec
 		var server = &http.Server{
@@ -501,31 +514,6 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
-}
-
-func getLoggers() (*zap.Logger, *zap.SugaredLogger) {
-	prod, err := zap.NewProduction()
-	if err != nil {
-		panic(err.Error())
-	}
-
-	logger := prod.Sugar()
-
-	return prod, logger
-}
-
-func prepareConfig() (*config.Config, error) {
-	conf := new(config.Config)
-
-	if err := envconfig.Usage("nsm", conf); err != nil {
-		return nil, err
-	}
-
-	if err := envconfig.Process("nsm", conf); err != nil {
-		return nil, err
-	}
-
-	return conf, nil
 }
 
 func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
