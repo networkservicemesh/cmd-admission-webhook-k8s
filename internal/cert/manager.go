@@ -31,12 +31,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 	"github.com/pkg/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+
+	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 )
 
 // Manager provides tools for working with certificates
