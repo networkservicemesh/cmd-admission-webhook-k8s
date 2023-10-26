@@ -20,15 +20,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	"fmt"
-	"math/big"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -48,7 +39,8 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	WebhookMode           string            `default:"spire" desc:"Set to 'selfsigned' to use the automatically generated webhook configuration" split_words:"true"`
+	WebhookMode           string            `default:"spire" desc:"Set to 'secret' to use custom certificates from k8s secret. Set to 'selfsigned' to use the automatically generated webhook configuration" split_words:"true"`
+	SecretName            string            `desc:"Name of the k8s secret that allows to use custom certificates for webhook" split_words:"true"`
 	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
@@ -59,10 +51,11 @@ type Config struct {
 	SidecarRequestsMemory string            `default:"40Mi" desc:"Lower bound of the NSM sidecar requests memory limits (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsCPU    string            `default:"100m" desc:"Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units)" split_words:"true"`
 	envs                  []corev1.EnvVar
-	caBundle              []byte
-	cert                  tls.Certificate
 	once                  sync.Once
 }
+
+// Mode type
+type Mode uint32
 
 // These are the different mode of webhook setup.
 const (
@@ -70,10 +63,21 @@ const (
 	SelfsignedMode Mode = iota
 	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration
 	SpireMode
+	// SecretMode requires to use k8s tls secret from the same Config.Namespace with the provided certificates
+	SecretMode
 )
 
-// Mode type
-type Mode uint32
+// These are the expecting fields name in k8s certificate secret
+const (
+	CertFieldName = "tls.crt"
+	KeyFieldName  = "tls.key"
+)
+
+// GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
+func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
+	c.once.Do(c.initializeEnvs)
+	return c.envs
+}
 
 // ParseMode takes a string mode and returns the webhook Mode constant.
 func ParseMode(mode string) (Mode, error) {
@@ -82,54 +86,12 @@ func ParseMode(mode string) (Mode, error) {
 		return SelfsignedMode, nil
 	case "spire":
 		return SpireMode, nil
+	case "secret":
+		return SecretMode, nil
 	}
 
 	var m Mode
-	return m, errors.Errorf("not a valid webhook mode: %q", mode)
-}
-
-func (mode Mode) marshalText() ([]byte, error) {
-	switch mode {
-	case SelfsignedMode:
-		return []byte("selfsigned"), nil
-	case SpireMode:
-		return []byte("spire"), nil
-	}
-
-	return nil, errors.Errorf("not a valid webhook mode %d", mode)
-}
-
-// String convert the Mode to a string. E.g. SelfsignedMode becomes "selfsigned".
-func (mode Mode) String() string {
-	if m, err := mode.marshalText(); err == nil {
-		return string(m)
-	}
-
-	return "unknown"
-}
-
-// GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
-func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
-	c.once.Do(c.initialize)
-	return c.envs
-}
-
-// GetOrResolveCertificate tries to create certificate from Config.CertFilePath, Config.KeyFilePath or creates self signed in memory certificate.
-func (c *Config) GetOrResolveCertificate() tls.Certificate {
-	c.once.Do(c.initialize)
-	return c.cert
-}
-
-// GetOrResolveCABundle tries to lookup CA bundle from passed Config.CABundleFilePath or returns ca bundle from self signed in memory certificate.
-func (c *Config) GetOrResolveCABundle() []byte {
-	c.once.Do(c.initialize)
-	return c.caBundle
-}
-
-func (c *Config) initialize() {
-	c.initializeEnvs()
-	c.initializeCert()
-	c.initializeCABundle()
+	return m, errors.Errorf("not a valid webhook mode: %s", mode)
 }
 
 func (c *Config) initializeEnvs() {
@@ -156,77 +118,24 @@ func (c *Config) initializeEnvs() {
 	)
 }
 
-func (c *Config) initializeCABundle() {
-	if len(c.caBundle) != 0 {
-		return
+func (mode Mode) marshalText() ([]byte, error) {
+	switch mode {
+	case SelfsignedMode:
+		return []byte("selfsigned"), nil
+	case SpireMode:
+		return []byte("spire"), nil
+	case SecretMode:
+		return []byte("secret"), nil
 	}
-	r, err := os.ReadFile(c.CABundleFilePath)
-	if err != nil {
-		panic(err.Error())
-	}
-	c.caBundle = r
+
+	return nil, errors.Errorf("not a valid webhook mode %d", mode)
 }
 
-func (c *Config) initializeCert() {
-	if c.CertFilePath != "" && c.KeyFilePath != "" {
-		cert, err := tls.LoadX509KeyPair(c.CertFilePath, c.KeyFilePath)
-		if err != nil {
-			panic(err.Error())
-		}
-		c.cert = cert
-	}
-	c.cert = c.selfSignedInMemoryCertificate()
-}
-
-func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {
-	now := time.Now()
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(now.Unix()),
-		Subject: pkix.Name{
-			CommonName: fmt.Sprintf("networkservicemesh.%v-ca", c.ServiceName),
-		},
-		NotBefore:             now,
-		NotAfter:              now.AddDate(1, 0, 0),
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		KeyUsage: x509.KeyUsageKeyEncipherment |
-			x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		DNSNames: []string{
-			fmt.Sprintf("%v.%v", c.ServiceName, c.Namespace),
-			fmt.Sprintf("%v.%v.svc", c.ServiceName, c.Namespace),
-		},
+// String convert the Mode to a string. E.g. SelfsignedMode becomes "selfsigned".
+func (mode Mode) String() string {
+	if m, err := mode.marshalText(); err == nil {
+		return string(m)
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	certRaw, err := x509.CreateCertificate(rand.Reader, template, template, privateKey.Public(), privateKey)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	pemCert := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certRaw,
-	})
-
-	pemKey := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-
-	result, err := tls.X509KeyPair(pemCert, pemKey)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	c.caBundle = pemCert
-	return result
+	return "unknown"
 }

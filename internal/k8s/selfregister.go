@@ -1,6 +1,6 @@
 // Copyright (c) 2022 Doc.ai and/or its affiliates.
 //
-// Copyright (c) 2022 Cisco and/or its affiliates.
+// Copyright (c) 2022-2023 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -32,6 +32,7 @@ import (
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/client-go/rest"
 
+	"github.com/networkservicemesh/cmd-admission-webhook/internal/cert"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 )
 
@@ -55,7 +56,8 @@ func (a *AdmissionWebhookRegisterClient) initializeClient() {
 }
 
 // Register registers MutatingWebhookConfiguration based on passed config.Config
-func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, c *config.Config) error {
+func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, mngr *cert.Manager) error {
+	c := mngr.GetConfig()
 	a.once.Do(a.initializeClient)
 	a.Logger.Infof("Starting to register MutatingWebhookConfiguration based config: %#v", c)
 	defer a.Logger.Infof("Register for config %#v is done", c)
@@ -113,7 +115,7 @@ func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, c *config
 						Name:      c.ServiceName,
 						Path:      &path,
 					},
-					CABundle: c.GetOrResolveCABundle(),
+					CABundle: mngr.GetOrResolveCABundle(),
 				},
 			},
 		},

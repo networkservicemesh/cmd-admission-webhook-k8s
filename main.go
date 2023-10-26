@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	psa "k8s.io/pod-security-admission/api"
 
+	"github.com/networkservicemesh/cmd-admission-webhook/internal/cert"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/k8s"
 	kubeutils "github.com/networkservicemesh/sdk-k8s/pkg/tools/k8s"
@@ -438,19 +439,21 @@ func main() {
 		}()
 	}
 
+	certManager := cert.NewManager(conf)
+
 	mode, err := config.ParseMode(conf.WebhookMode)
 	if err != nil {
 		logger.Fatalf("unknown webhook mode selected: %v", err.Error())
 	}
 
 	if mode == config.SelfsignedMode {
-		unregister := registerSelf(ctx, conf, logger)
+		unregister := registerSelf(ctx, certManager, logger)
 		defer func() {
-			_ = unregister(context.Background(), conf)
+			_ = unregister(context.Background(), certManager.GetConfig())
 		}()
 	}
 
-	tlsConfig, err := prepareTLSConfig(ctx, conf, mode)
+	tlsConfig, err := prepareTLSConfig(ctx, certManager, mode)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
@@ -517,12 +520,12 @@ func main() {
 	}
 }
 
-func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
+func registerSelf(ctx context.Context, mngr *cert.Manager, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
 	var registerClient = k8s.AdmissionWebhookRegisterClient{
 		Logger: logger.Named("admissionWebhookRegisterClient"),
 	}
 
-	err := registerClient.Register(ctx, conf)
+	err := registerClient.Register(ctx, mngr)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
@@ -530,20 +533,22 @@ func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredL
 	return registerClient.Unregister
 }
 
-func prepareTLSConfig(ctx context.Context, conf *config.Config, mode config.Mode) (*tls.Config, error) {
+func prepareTLSConfig(ctx context.Context, mngr *cert.Manager, mode config.Mode) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 
 	switch mode {
 	case config.SelfsignedMode:
-		tlsConfig.Certificates = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
+		tlsConfig.Certificates = append([]tls.Certificate(nil), mngr.GetOrResolveCertificate())
 	case config.SpireMode:
 		source, err := workloadapi.NewX509Source(ctx)
 		if err != nil {
 			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
 		}
 		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+	case config.SecretMode:
+		tlsConfig.Certificates = append([]tls.Certificate(nil), mngr.GetOrResolveCertificateFromSecret(ctx))
 	default:
 		return nil, errors.Errorf("mode is not supported: %v", mode.String())
 	}
