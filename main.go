@@ -446,7 +446,7 @@ func main() {
 		logger.Fatalf("unknown webhook mode selected: %v", err.Error())
 	}
 
-	if mode == config.SelfsignedMode {
+	if mode == config.SelfregisterMode {
 		unregister := registerSelf(ctx, certManager, logger)
 		defer func() {
 			_ = unregister(context.Background(), certManager.GetConfig())
@@ -539,7 +539,7 @@ func prepareTLSConfig(ctx context.Context, mngr *cert.Manager, mode config.Mode)
 	}
 
 	switch mode {
-	case config.SelfsignedMode:
+	case config.SelfregisterMode:
 		tlsConfig.Certificates = append([]tls.Certificate(nil), mngr.GetOrResolveCertificate())
 	case config.SpireMode:
 		source, err := workloadapi.NewX509Source(ctx)

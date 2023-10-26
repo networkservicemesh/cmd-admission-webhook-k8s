@@ -39,7 +39,7 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	WebhookMode           string            `default:"spire" desc:"Set to 'secret' to use custom certificates from k8s secret. Set to 'selfsigned' to use the automatically generated webhook configuration" split_words:"true"`
+	WebhookMode           string            `default:"spire" desc:"Set to 'secret' to use custom certificates from k8s secret. Set to 'selfregister' to use the automatically generated webhook configuration" split_words:"true"`
 	SecretName            string            `desc:"Name of the k8s secret that allows to use custom certificates for webhook" split_words:"true"`
 	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
@@ -59,8 +59,8 @@ type Mode uint32
 
 // These are the different mode of webhook setup.
 const (
-	// SelfsignedMode allows you to use an automatically generated webhook configuration and certificate
-	SelfsignedMode Mode = iota
+	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate
+	SelfregisterMode Mode = iota
 	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration
 	SpireMode
 	// SecretMode requires to use k8s tls secret from the same Config.Namespace with the provided certificates
@@ -82,8 +82,8 @@ func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
 // ParseMode takes a string mode and returns the webhook Mode constant.
 func ParseMode(mode string) (Mode, error) {
 	switch strings.ToLower(mode) {
-	case "selfsigned":
-		return SelfsignedMode, nil
+	case "selfregister":
+		return SelfregisterMode, nil
 	case "spire":
 		return SpireMode, nil
 	case "secret":
@@ -120,8 +120,8 @@ func (c *Config) initializeEnvs() {
 
 func (mode Mode) marshalText() ([]byte, error) {
 	switch mode {
-	case SelfsignedMode:
-		return []byte("selfsigned"), nil
+	case SelfregisterMode:
+		return []byte("selfregister"), nil
 	case SpireMode:
 		return []byte("spire"), nil
 	case SecretMode:
@@ -131,7 +131,7 @@ func (mode Mode) marshalText() ([]byte, error) {
 	return nil, errors.Errorf("not a valid webhook mode %d", mode)
 }
 
-// String convert the Mode to a string. E.g. SelfsignedMode becomes "selfsigned".
+// String convert the Mode to a string. E.g. SelfregisterMode becomes "selfregister".
 func (mode Mode) String() string {
 	if m, err := mode.marshalText(); err == nil {
 		return string(m)
