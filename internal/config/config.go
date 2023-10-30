@@ -20,12 +20,28 @@
 package config
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	corev1 "k8s.io/api/core/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 )
 
 // Config represents env configuration for cmd-admission-webhook-k8s
@@ -51,6 +67,10 @@ type Config struct {
 	SidecarRequestsMemory string            `default:"40Mi" desc:"Lower bound of the NSM sidecar requests memory limits (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsCPU    string            `default:"100m" desc:"Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units)" split_words:"true"`
 	envs                  []corev1.EnvVar
+	secretsClient         coreV1Types.SecretInterface
+	caBundle              []byte
+	cert                  tls.Certificate
+	mode                  Mode
 	once                  sync.Once
 }
 
@@ -69,29 +89,69 @@ const (
 
 // These are the expecting fields name in k8s certificate secret
 const (
-	CertFieldName = "tls.crt"
-	KeyFieldName  = "tls.key"
+	certFieldName = "tls.crt"
+	keyFieldName  = "tls.key"
 )
 
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
-func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
-	c.once.Do(c.initializeEnvs)
+func (c *Config) GetOrResolveEnvs(ctx context.Context) []corev1.EnvVar {
+	c.once.Do(func() { c.initialize(ctx) })
 	return c.envs
 }
 
-// ParseMode takes a string mode and returns the webhook Mode constant.
-func ParseMode(mode string) (Mode, error) {
-	switch strings.ToLower(mode) {
-	case "selfregister":
-		return SelfregisterMode, nil
-	case "spire":
-		return SpireMode, nil
-	case "secret":
-		return SecretMode, nil
+// GetOrResolveMode tries to parse Config.WebhookMode and return parsed values.
+func (c *Config) GetOrResolveMode(ctx context.Context) Mode {
+	c.once.Do(func() { c.initialize(ctx) })
+	return c.mode
+}
+
+// GetOrResolveCABundle tries to lookup CA bundle from passed Config.CABundleFilePath or returns ca bundle from self signed in memory certificate.
+func (c *Config) GetOrResolveCABundle(ctx context.Context) []byte {
+	c.once.Do(func() { c.initialize(ctx) })
+	return c.caBundle
+}
+
+// PrepareTLSConfig returns a configuration that includes certificates for proper working of http.Server, depending on the selected webhook mode.
+func (c *Config) PrepareTLSConfig(ctx context.Context) (*tls.Config, error) {
+	c.once.Do(func() { c.initialize(ctx) })
+
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
 	}
 
-	var m Mode
-	return m, errors.Errorf("not a valid webhook mode: %s", mode)
+	if c.mode == SpireMode {
+		source, err := workloadapi.NewX509Source(ctx)
+		if err != nil {
+			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
+		}
+		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+
+		select {
+		case <-ctx.Done():
+			err = source.Close()
+			if err != nil {
+				panic(errors.Errorf("unable to close x509 source: %v", err.Error()))
+			}
+		default:
+		}
+	} else {
+		tlsConfig.Certificates = append([]tls.Certificate(nil), c.getOrResolveCertificate(ctx))
+	}
+
+	return tlsConfig, nil
+}
+
+func (c *Config) initialize(ctx context.Context) {
+	c.initializeEnvs()
+	c.initializeMode()
+	c.initializeCert(ctx)
+	c.initializeCABundle()
+}
+
+// getOrResolveCertificate tries to create certificate from Config.CertFilePath, Config.KeyFilePath or creates self signed in memory certificate.
+func (c *Config) getOrResolveCertificate(ctx context.Context) tls.Certificate {
+	c.once.Do(func() { c.initialize(ctx) })
+	return c.cert
 }
 
 func (c *Config) initializeEnvs() {
@@ -118,24 +178,163 @@ func (c *Config) initializeEnvs() {
 	)
 }
 
-func (mode Mode) marshalText() ([]byte, error) {
-	switch mode {
-	case SelfregisterMode:
-		return []byte("selfregister"), nil
-	case SpireMode:
-		return []byte("spire"), nil
-	case SecretMode:
-		return []byte("secret"), nil
+func (c *Config) initializeMode() {
+	mode, err := parseMode(c.WebhookMode)
+	if err != nil {
+		panic(err.Error())
 	}
-
-	return nil, errors.Errorf("not a valid webhook mode %d", mode)
+	c.mode = mode
 }
 
-// String convert the Mode to a string. E.g. SelfregisterMode becomes "selfregister".
-func (mode Mode) String() string {
-	if m, err := mode.marshalText(); err == nil {
-		return string(m)
+func (c *Config) initializeCertsClient() {
+	if c.secretsClient != nil {
+		return
 	}
 
-	return "unknown"
+	conf, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	clientset, err := kubernetes.NewForConfig(conf)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	c.secretsClient = clientset.CoreV1().Secrets(c.Namespace)
+}
+
+func (c *Config) initializeCABundle() {
+	if c.mode != SelfregisterMode {
+		return
+	}
+
+	if len(c.caBundle) != 0 {
+		return
+	}
+	r, err := os.ReadFile(c.CABundleFilePath)
+	if err != nil {
+		panic(err.Error())
+	}
+	c.caBundle = r
+}
+
+func (c *Config) initializeCert(ctx context.Context) {
+	switch c.mode {
+	case SelfregisterMode:
+		if c.CertFilePath != "" && c.KeyFilePath != "" {
+			cert, err := tls.LoadX509KeyPair(c.CertFilePath, c.KeyFilePath)
+			if err != nil {
+				panic(err.Error())
+			}
+			c.cert = cert
+			return
+		}
+		c.cert = c.selfSignedInMemoryCertificate()
+	case SecretMode:
+		c.initializeCertsClient()
+		c.initializeSecretCert(ctx)
+	}
+}
+
+func (c *Config) initializeSecretCert(ctx context.Context) {
+	if len(c.cert.Certificate) != 0 {
+		return
+	}
+
+	if c.SecretName == "" {
+		panic(errors.New("webhook mode 'secret' requires a non-empty Config.SecretName variable"))
+	}
+
+	secret, err := c.secretsClient.Get(ctx, c.SecretName, metaV1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var pemCert []byte
+	var pemKey []byte
+
+	for key, value := range secret.Data {
+		switch key {
+		case certFieldName:
+			pemCert = value
+		case keyFieldName:
+			pemKey = value
+		}
+	}
+
+	result, err := tls.X509KeyPair(pemCert, pemKey)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	c.cert = result
+}
+
+func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {
+	now := time.Now()
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(now.Unix()),
+		Subject: pkix.Name{
+			CommonName: fmt.Sprintf("networkservicemesh.%v-ca", c.ServiceName),
+		},
+		NotBefore:             now,
+		NotAfter:              now.AddDate(1, 0, 0),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage: x509.KeyUsageKeyEncipherment |
+			x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		DNSNames: []string{
+			fmt.Sprintf("%v.%v", c.ServiceName, c.Namespace),
+			fmt.Sprintf("%v.%v.svc", c.ServiceName, c.Namespace),
+		},
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	certRaw, err := x509.CreateCertificate(rand.Reader, template, template, privateKey.Public(), privateKey)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	pemCert := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certRaw,
+	})
+
+	pemKey := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+
+	result, err := tls.X509KeyPair(pemCert, pemKey)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	c.caBundle = pemCert
+	return result
+}
+
+// parseMode takes a string mode and returns the webhook Mode constant.
+func parseMode(mode string) (Mode, error) {
+	switch strings.ToLower(mode) {
+	case "selfregister":
+		return SelfregisterMode, nil
+	case "spire":
+		return SpireMode, nil
+	case "secret":
+		return SecretMode, nil
+	}
+
+	var m Mode
+	return m, errors.Errorf("not a valid webhook mode: %s", mode)
 }

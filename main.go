@@ -20,7 +20,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,9 +37,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/pkg/errors"
-	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
-	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"go.uber.org/zap"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -53,7 +49,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	psa "k8s.io/pod-security-admission/api"
 
-	"github.com/networkservicemesh/cmd-admission-webhook/internal/cert"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/k8s"
 	kubeutils "github.com/networkservicemesh/sdk-k8s/pkg/tools/k8s"
@@ -120,7 +115,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 			clientID := uuid.NewString()
 			nsmNameEnv.Value = fmt.Sprintf("$(POD_NAME)-%v", clientID)
 		}
-		envVars := append(s.config.GetOrResolveEnvs(),
+		envVars := append(s.config.GetOrResolveEnvs(ctx),
 			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
 			nsmNameEnv)
 
@@ -439,21 +434,16 @@ func main() {
 		}()
 	}
 
-	certManager := cert.NewManager(conf)
-
-	mode, err := config.ParseMode(conf.WebhookMode)
-	if err != nil {
-		logger.Fatalf("unknown webhook mode selected: %v", err.Error())
-	}
+	mode := conf.GetOrResolveMode(ctx)
 
 	if mode == config.SelfregisterMode {
-		unregister := registerSelf(ctx, certManager, logger)
+		unregister := registerSelf(ctx, conf, logger)
 		defer func() {
-			_ = unregister(context.Background(), certManager.GetConfig())
+			_ = unregister(context.Background(), conf)
 		}()
 	}
 
-	tlsConfig, err := prepareTLSConfig(ctx, certManager, mode)
+	tlsConfig, err := conf.PrepareTLSConfig(ctx)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
@@ -520,40 +510,17 @@ func main() {
 	}
 }
 
-func registerSelf(ctx context.Context, mngr *cert.Manager, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
+func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
 	var registerClient = k8s.AdmissionWebhookRegisterClient{
 		Logger: logger.Named("admissionWebhookRegisterClient"),
 	}
 
-	err := registerClient.Register(ctx, mngr)
+	err := registerClient.Register(ctx, conf)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
 
 	return registerClient.Unregister
-}
-
-func prepareTLSConfig(ctx context.Context, mngr *cert.Manager, mode config.Mode) (*tls.Config, error) {
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-
-	switch mode {
-	case config.SelfregisterMode:
-		tlsConfig.Certificates = append([]tls.Certificate(nil), mngr.GetOrResolveCertificate())
-	case config.SpireMode:
-		source, err := workloadapi.NewX509Source(ctx)
-		if err != nil {
-			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
-		}
-		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
-	case config.SecretMode:
-		tlsConfig.Certificates = append([]tls.Certificate(nil), mngr.GetOrResolveCertificateFromSecret(ctx))
-	default:
-		return nil, errors.Errorf("mode is not supported: %v", mode.String())
-	}
-
-	return tlsConfig, nil
 }
 
 // Logs the response to the review request. Since the patch part of

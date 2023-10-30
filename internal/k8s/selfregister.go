@@ -32,7 +32,6 @@ import (
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/client-go/rest"
 
-	"github.com/networkservicemesh/cmd-admission-webhook/internal/cert"
 	"github.com/networkservicemesh/cmd-admission-webhook/internal/config"
 )
 
@@ -56,8 +55,7 @@ func (a *AdmissionWebhookRegisterClient) initializeClient() {
 }
 
 // Register registers MutatingWebhookConfiguration based on passed config.Config
-func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, mngr *cert.Manager) error {
-	c := mngr.GetConfig()
+func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, c *config.Config) error {
 	a.once.Do(a.initializeClient)
 	a.Logger.Infof("Starting to register MutatingWebhookConfiguration based config: %#v", c)
 	defer a.Logger.Infof("Register for config %#v is done", c)
@@ -115,7 +113,7 @@ func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, mngr *cer
 						Name:      c.ServiceName,
 						Path:      &path,
 					},
-					CABundle: mngr.GetOrResolveCABundle(),
+					CABundle: c.GetOrResolveCABundle(ctx),
 				},
 			},
 		},
