@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,6 +38,9 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"go.uber.org/zap"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -115,7 +119,7 @@ func (s *admissionWebhookServer) Review(ctx context.Context, in *admissionv1.Adm
 			clientID := uuid.NewString()
 			nsmNameEnv.Value = fmt.Sprintf("$(POD_NAME)-%v", clientID)
 		}
-		envVars := append(s.config.GetOrResolveEnvs(ctx),
+		envVars := append(s.config.GetOrResolveEnvs(),
 			corev1.EnvVar{Name: s.config.NSURLEnvName, Value: annotation},
 			nsmNameEnv)
 
@@ -434,16 +438,14 @@ func main() {
 		}()
 	}
 
-	mode := conf.GetOrResolveMode(ctx)
-
-	if mode == config.SelfregisterMode {
+	if conf.WebhookMode == config.SelfregisterMode {
 		unregister := registerSelf(ctx, conf, logger)
 		defer func() {
 			_ = unregister(context.Background(), conf)
 		}()
 	}
 
-	tlsConfig, err := conf.PrepareTLSConfig(ctx)
+	tlsConfig, err := prepareTLSConfig(ctx, conf, logger)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
@@ -508,6 +510,32 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+// prepareTLSConfig returns a configuration that includes certificates for proper working of http.Server, depending on the selected webhook mode.
+func prepareTLSConfig(ctx context.Context, c *config.Config, logger *zap.SugaredLogger) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if c.WebhookMode == config.SpireMode && !c.IsExistingCertificatesUsed() {
+		source, err := workloadapi.NewX509Source(ctx)
+		if err != nil {
+			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
+		}
+		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+
+		select {
+		case <-ctx.Done():
+			err = source.Close()
+			logger.Errorf("unable to close x509 source: %v", err.Error())
+		default:
+		}
+	} else {
+		tlsConfig.Certificates = []tls.Certificate{c.GetOrResolveCertificate()}
+	}
+
+	return tlsConfig, nil
 }
 
 func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {

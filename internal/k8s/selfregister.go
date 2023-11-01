@@ -113,7 +113,7 @@ func (a *AdmissionWebhookRegisterClient) Register(ctx context.Context, c *config
 						Name:      c.ServiceName,
 						Path:      &path,
 					},
-					CABundle: c.GetOrResolveCABundle(ctx),
+					CABundle: c.GetOrResolveCABundle(),
 				},
 			},
 		},

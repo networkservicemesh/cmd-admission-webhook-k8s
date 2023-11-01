@@ -20,7 +20,6 @@
 package config
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -34,14 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
-	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	corev1 "k8s.io/api/core/v1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 )
 
 // Config represents env configuration for cmd-admission-webhook-k8s
@@ -55,11 +47,10 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	WebhookMode           string            `default:"spire" desc:"Set to 'secret' to use custom certificates from k8s secret. Set to 'selfregister' to use the automatically generated webhook configuration" split_words:"true"`
-	SecretName            string            `desc:"Name of the k8s secret that allows to use custom certificates for webhook" split_words:"true"`
-	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
-	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
-	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
+	WebhookMode           Mode              `default:"0" desc:"Default '0' mode uses spire certificates and external webhook configuration. Set to '1' to use the automatically generated webhook configuration" split_words:"true"`
+	CertFilePath          string            `desc:"Path to certificate. Preferred use if specified" split_words:"true"`
+	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
+	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	MetricsExportInterval time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	SidecarLimitsMemory   string            `default:"80Mi" desc:"Lower bound of the NSM sidecar memory limit (in k8s resource management units)" split_words:"true"`
@@ -67,91 +58,49 @@ type Config struct {
 	SidecarRequestsMemory string            `default:"40Mi" desc:"Lower bound of the NSM sidecar requests memory limits (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsCPU    string            `default:"100m" desc:"Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units)" split_words:"true"`
 	envs                  []corev1.EnvVar
-	secretsClient         coreV1Types.SecretInterface
 	caBundle              []byte
 	cert                  tls.Certificate
-	mode                  Mode
 	once                  sync.Once
 }
 
 // Mode type
-type Mode uint32
+type Mode uint8
 
 // These are the different mode of webhook setup.
 const (
-	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate
-	SelfregisterMode Mode = iota
 	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration
-	SpireMode
-	// SecretMode requires to use k8s tls secret from the same Config.Namespace with the provided certificates
-	SecretMode
-)
-
-// These are the expecting fields name in k8s certificate secret
-const (
-	certFieldName = "tls.crt"
-	keyFieldName  = "tls.key"
+	SpireMode Mode = iota
+	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate
+	SelfregisterMode
 )
 
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
-func (c *Config) GetOrResolveEnvs(ctx context.Context) []corev1.EnvVar {
-	c.once.Do(func() { c.initialize(ctx) })
+func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
+	c.once.Do(c.initialize)
 	return c.envs
 }
 
-// GetOrResolveMode tries to parse Config.WebhookMode and return parsed values.
-func (c *Config) GetOrResolveMode(ctx context.Context) Mode {
-	c.once.Do(func() { c.initialize(ctx) })
-	return c.mode
-}
-
 // GetOrResolveCABundle tries to lookup CA bundle from passed Config.CABundleFilePath or returns ca bundle from self signed in memory certificate.
-func (c *Config) GetOrResolveCABundle(ctx context.Context) []byte {
-	c.once.Do(func() { c.initialize(ctx) })
+func (c *Config) GetOrResolveCABundle() []byte {
+	c.once.Do(c.initialize)
 	return c.caBundle
 }
 
-// PrepareTLSConfig returns a configuration that includes certificates for proper working of http.Server, depending on the selected webhook mode.
-func (c *Config) PrepareTLSConfig(ctx context.Context) (*tls.Config, error) {
-	c.once.Do(func() { c.initialize(ctx) })
-
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-
-	if c.mode == SpireMode {
-		source, err := workloadapi.NewX509Source(ctx)
-		if err != nil {
-			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
-		}
-		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
-
-		select {
-		case <-ctx.Done():
-			err = source.Close()
-			if err != nil {
-				panic(errors.Errorf("unable to close x509 source: %v", err.Error()))
-			}
-		default:
-		}
-	} else {
-		tlsConfig.Certificates = append([]tls.Certificate(nil), c.getOrResolveCertificate(ctx))
-	}
-
-	return tlsConfig, nil
-}
-
-func (c *Config) initialize(ctx context.Context) {
-	c.initializeEnvs()
-	c.initializeMode()
-	c.initializeCert(ctx)
-	c.initializeCABundle()
-}
-
-// getOrResolveCertificate tries to create certificate from Config.CertFilePath, Config.KeyFilePath or creates self signed in memory certificate.
-func (c *Config) getOrResolveCertificate(ctx context.Context) tls.Certificate {
-	c.once.Do(func() { c.initialize(ctx) })
+// GetOrResolveCertificate tries to create certificate from Config.CertFilePath, Config.KeyFilePath or creates self signed in memory certificate.
+func (c *Config) GetOrResolveCertificate() tls.Certificate {
+	c.once.Do(c.initialize)
 	return c.cert
+}
+
+// IsExistingCertificatesUsed specifies whether user-provided certificates should be used
+func (c *Config) IsExistingCertificatesUsed() bool {
+	return c.CertFilePath != "" && c.KeyFilePath != ""
+}
+
+func (c *Config) initialize() {
+	c.initializeEnvs()
+	c.initializeCert()
+	c.initializeCABundle()
 }
 
 func (c *Config) initializeEnvs() {
@@ -178,34 +127,8 @@ func (c *Config) initializeEnvs() {
 	)
 }
 
-func (c *Config) initializeMode() {
-	mode, err := parseMode(c.WebhookMode)
-	if err != nil {
-		panic(err.Error())
-	}
-	c.mode = mode
-}
-
-func (c *Config) initializeCertsClient() {
-	if c.secretsClient != nil {
-		return
-	}
-
-	conf, err := rest.InClusterConfig()
-	if err != nil {
-		panic(err.Error())
-	}
-
-	clientset, err := kubernetes.NewForConfig(conf)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	c.secretsClient = clientset.CoreV1().Secrets(c.Namespace)
-}
-
 func (c *Config) initializeCABundle() {
-	if c.mode != SelfregisterMode {
+	if c.WebhookMode != SelfregisterMode {
 		return
 	}
 
@@ -219,56 +142,19 @@ func (c *Config) initializeCABundle() {
 	c.caBundle = r
 }
 
-func (c *Config) initializeCert(ctx context.Context) {
-	switch c.mode {
-	case SelfregisterMode:
-		if c.CertFilePath != "" && c.KeyFilePath != "" {
-			cert, err := tls.LoadX509KeyPair(c.CertFilePath, c.KeyFilePath)
-			if err != nil {
-				panic(err.Error())
-			}
-			c.cert = cert
-			return
+func (c *Config) initializeCert() {
+	if c.IsExistingCertificatesUsed() {
+		cert, err := tls.LoadX509KeyPair(c.CertFilePath, c.KeyFilePath)
+		if err != nil {
+			panic(err.Error())
 		}
-		c.cert = c.selfSignedInMemoryCertificate()
-	case SecretMode:
-		c.initializeCertsClient()
-		c.initializeSecretCert(ctx)
-	}
-}
-
-func (c *Config) initializeSecretCert(ctx context.Context) {
-	if len(c.cert.Certificate) != 0 {
+		c.cert = cert
 		return
 	}
 
-	if c.SecretName == "" {
-		panic(errors.New("webhook mode 'secret' requires a non-empty Config.SecretName variable"))
+	if c.WebhookMode == SelfregisterMode {
+		c.cert = c.selfSignedInMemoryCertificate()
 	}
-
-	secret, err := c.secretsClient.Get(ctx, c.SecretName, metaV1.GetOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	var pemCert []byte
-	var pemKey []byte
-
-	for key, value := range secret.Data {
-		switch key {
-		case certFieldName:
-			pemCert = value
-		case keyFieldName:
-			pemKey = value
-		}
-	}
-
-	result, err := tls.X509KeyPair(pemCert, pemKey)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	c.cert = result
 }
 
 func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {
@@ -322,19 +208,4 @@ func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {
 
 	c.caBundle = pemCert
 	return result
-}
-
-// parseMode takes a string mode and returns the webhook Mode constant.
-func parseMode(mode string) (Mode, error) {
-	switch strings.ToLower(mode) {
-	case "selfregister":
-		return SelfregisterMode, nil
-	case "spire":
-		return SpireMode, nil
-	case "secret":
-		return SecretMode, nil
-	}
-
-	var m Mode
-	return m, errors.Errorf("not a valid webhook mode: %s", mode)
 }
