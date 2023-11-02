@@ -33,8 +33,8 @@ require (
 	go.opentelemetry.io/otel/exporters/prometheus v0.42.0-rc.1 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/tools v0.9.3 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/component-base v0.25.4 // indirect
 )
@@ -63,8 +63,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/networkservicemesh/api v1.10.1-0.20230822145124-c4a3ece88804 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/networkservicemesh/api v1.11.1-0.20231031152153-730abd666985 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.1.6
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
