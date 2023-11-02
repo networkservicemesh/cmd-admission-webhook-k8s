@@ -35,7 +35,6 @@ import (
 	_ "k8s.io/apimachinery/pkg/runtime/serializer"
 	_ "k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
-	_ "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/rest"
 	_ "k8s.io/pod-security-admission/api"
 	_ "math/big"
