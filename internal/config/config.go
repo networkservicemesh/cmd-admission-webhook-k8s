@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -47,7 +48,7 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	WebhookMode           Mode              `default:"0" desc:"Default '0' mode uses spire certificates and external webhook configuration. Set to '1' to use the automatically generated webhook configuration" split_words:"true"`
+	WebhookMode           Mode              `default:"spire" desc:"Default 'spire' mode uses spire certificates and external webhook configuration. Set to 'selfregister' to use the automatically generated webhook configuration" split_words:"true"`
 	CertFilePath          string            `desc:"Path to certificate. Preferred use if specified" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
@@ -63,14 +64,27 @@ type Config struct {
 	once                  sync.Once
 }
 
-// Mode type
+// Mode internal webhook mode type.
 type Mode uint8
+
+// Decode takes a string mode and returns the webhook Mode constant.
+func (md *Mode) Decode(mode string) error {
+	switch strings.ToLower(mode) {
+	case "selfregister":
+		*md = SelfregisterMode
+		return nil
+	case "spire":
+		*md = SpireMode
+		return nil
+	}
+	return errors.Errorf("not a valid webhook mode: %s", mode)
+}
 
 // These are the different mode of webhook setup.
 const (
-	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration
+	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration.
 	SpireMode Mode = iota
-	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate
+	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate.
 	SelfregisterMode
 )
 
@@ -92,7 +106,7 @@ func (c *Config) GetOrResolveCertificate() tls.Certificate {
 	return c.cert
 }
 
-// IsExistingCertificatesUsed specifies whether user-provided certificates should be used
+// IsExistingCertificatesUsed specifies whether user-provided certificates should be used.
 func (c *Config) IsExistingCertificatesUsed() bool {
 	return c.CertFilePath != "" && c.KeyFilePath != ""
 }
