@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -47,9 +48,10 @@ type Config struct {
 	InitContainerImages   []string          `desc:"List of init containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	ContainerImages       []string          `desc:"List of containers that should be appended for each deployment that has Config.Annotation" split_words:"true"`
 	Envs                  []string          `desc:"Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages" split_words:"true"`
-	CertFilePath          string            `desc:"Path to certificate" split_words:"true"`
-	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath" split_words:"true"`
-	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath" split_words:"true"`
+	WebhookMode           Mode              `default:"spire" desc:"Default 'spire' mode uses spire certificates and external webhook configuration. Set to 'selfregister' to use the automatically generated webhook configuration" split_words:"true"`
+	CertFilePath          string            `desc:"Path to certificate. Preferred use if specified" split_words:"true"`
+	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
+	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	MetricsExportInterval time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	SidecarLimitsMemory   string            `default:"80Mi" desc:"Lower bound of the NSM sidecar memory limit (in k8s resource management units)" split_words:"true"`
@@ -62,10 +64,40 @@ type Config struct {
 	once                  sync.Once
 }
 
+// Mode internal webhook mode type.
+type Mode uint8
+
+// Decode takes a string mode and returns the webhook Mode constant.
+func (md *Mode) Decode(mode string) error {
+	switch strings.ToLower(mode) {
+	case "selfregister":
+		*md = SelfregisterMode
+		return nil
+	case "spire":
+		*md = SpireMode
+		return nil
+	}
+	return errors.Errorf("not a valid webhook mode: %s", mode)
+}
+
+// These are the different mode of webhook setup.
+const (
+	// SpireMode requires using spire configuration to obtain certificate and manually applying webhook configuration.
+	SpireMode Mode = iota
+	// SelfregisterMode allows you to use an automatically generated webhook configuration and certificate.
+	SelfregisterMode
+)
+
 // GetOrResolveEnvs converts on the first call passed Config.Envs into []corev1.EnvVar or returns parsed values.
 func (c *Config) GetOrResolveEnvs() []corev1.EnvVar {
 	c.once.Do(c.initialize)
 	return c.envs
+}
+
+// GetOrResolveCABundle tries to lookup CA bundle from passed Config.CABundleFilePath or returns ca bundle from self signed in memory certificate.
+func (c *Config) GetOrResolveCABundle() []byte {
+	c.once.Do(c.initialize)
+	return c.caBundle
 }
 
 // GetOrResolveCertificate tries to create certificate from Config.CertFilePath, Config.KeyFilePath or creates self signed in memory certificate.
@@ -74,10 +106,9 @@ func (c *Config) GetOrResolveCertificate() tls.Certificate {
 	return c.cert
 }
 
-// GetOrResolveCABundle tries to lookup CA bundle from passed Config.CABundleFilePath or returns ca bundle from self signed in memory certificate.
-func (c *Config) GetOrResolveCABundle() []byte {
-	c.once.Do(c.initialize)
-	return c.caBundle
+// IsExistingCertificatesUsed specifies whether user-provided certificates should be used.
+func (c *Config) IsExistingCertificatesUsed() bool {
+	return c.CertFilePath != "" && c.KeyFilePath != ""
 }
 
 func (c *Config) initialize() {
@@ -111,6 +142,10 @@ func (c *Config) initializeEnvs() {
 }
 
 func (c *Config) initializeCABundle() {
+	if c.WebhookMode != SelfregisterMode {
+		return
+	}
+
 	if len(c.caBundle) != 0 {
 		return
 	}
@@ -122,14 +157,18 @@ func (c *Config) initializeCABundle() {
 }
 
 func (c *Config) initializeCert() {
-	if c.CertFilePath != "" && c.KeyFilePath != "" {
+	if c.IsExistingCertificatesUsed() {
 		cert, err := tls.LoadX509KeyPair(c.CertFilePath, c.KeyFilePath)
 		if err != nil {
 			panic(err.Error())
 		}
 		c.cert = cert
+		return
 	}
-	c.cert = c.selfSignedInMemoryCertificate()
+
+	if c.WebhookMode == SelfregisterMode {
+		c.cert = c.selfSignedInMemoryCertificate()
+	}
 }
 
 func (c *Config) selfSignedInMemoryCertificate() tls.Certificate {

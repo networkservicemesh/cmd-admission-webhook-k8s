@@ -168,3 +168,7 @@ issues:
     - path: main.go
       linters:
         - goconst
+    - path: main.go
+      linters:
+        - gocyclo
+      text: "cyclomatic complexity \\d+ of func `main` is high \\(> \\d+\\)"

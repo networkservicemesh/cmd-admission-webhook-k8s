@@ -38,6 +38,9 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"go.uber.org/zap"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -435,18 +438,17 @@ func main() {
 		}()
 	}
 
-	var registerClient = k8s.AdmissionWebhookRegisterClient{
-		Logger: logger.Named("admissionWebhookRegisterClient"),
+	if conf.WebhookMode == config.SelfregisterMode {
+		unregister := registerSelf(ctx, conf, logger)
+		defer func() {
+			_ = unregister(context.Background(), conf)
+		}()
 	}
 
-	err = registerClient.Register(ctx, conf)
+	tlsConfig, err := prepareTLSConfig(ctx, conf, logger)
 	if err != nil {
-		prod.Fatal(err.Error())
+		logger.Fatal(err.Error())
 	}
-
-	defer func() {
-		_ = registerClient.Unregister(context.Background(), conf)
-	}()
 
 	s := echo.New()
 	s.Use(middleware.Logger())
@@ -490,16 +492,12 @@ func main() {
 	})
 
 	var startServerErr = make(chan error)
-	go func() {
-		var certs = append([]tls.Certificate(nil), conf.GetOrResolveCertificate())
 
+	go func() {
 		// #nosec
 		var server = &http.Server{
-			Addr: ":443",
-			TLSConfig: &tls.Config{
-				Certificates: certs,
-				MinVersion:   tls.VersionTLS12,
-			},
+			Addr:      ":443",
+			TLSConfig: tlsConfig,
 		}
 		startServerErr <- s.StartServer(server)
 	}()
@@ -512,6 +510,45 @@ func main() {
 	case <-ctx.Done():
 		return
 	}
+}
+
+// prepareTLSConfig returns a configuration that includes certificates for proper working of http.Server, depending on the selected webhook mode.
+func prepareTLSConfig(ctx context.Context, c *config.Config, logger *zap.SugaredLogger) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if c.WebhookMode == config.SpireMode && !c.IsExistingCertificatesUsed() {
+		source, err := workloadapi.NewX509Source(ctx)
+		if err != nil {
+			return nil, errors.Errorf("error getting x509 source: %v", err.Error())
+		}
+		tlsConfig.GetCertificate = tlsconfig.GetCertificate(source)
+
+		select {
+		case <-ctx.Done():
+			err = source.Close()
+			logger.Errorf("unable to close x509 source: %v", err.Error())
+		default:
+		}
+	} else {
+		tlsConfig.Certificates = []tls.Certificate{c.GetOrResolveCertificate()}
+	}
+
+	return tlsConfig, nil
+}
+
+func registerSelf(ctx context.Context, conf *config.Config, logger *zap.SugaredLogger) func(ctx context.Context, c *config.Config) error {
+	var registerClient = k8s.AdmissionWebhookRegisterClient{
+		Logger: logger.Named("admissionWebhookRegisterClient"),
+	}
+
+	err := registerClient.Register(ctx, conf)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+
+	return registerClient.Unregister
 }
 
 // Logs the response to the review request. Since the patch part of
