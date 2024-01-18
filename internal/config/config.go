@@ -1,6 +1,6 @@
 // Copyright (c) 2021-2023 Doc.ai and/or its affiliates.
 //
-// Copyright (c) 2023 Cisco and/or its affiliates.
+// Copyright (c) 2023-2024 Cisco and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -58,10 +58,12 @@ type Config struct {
 	SidecarLimitsCPU      string            `default:"200m" desc:"Lower bound of the NSM sidecar CPU limit (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsMemory string            `default:"40Mi" desc:"Lower bound of the NSM sidecar requests memory limits (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsCPU    string            `default:"100m" desc:"Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units)" split_words:"true"`
-	envs                  []corev1.EnvVar
-	caBundle              []byte
-	cert                  tls.Certificate
-	once                  sync.Once
+	// QPS for 50 NSC
+	KubeletQPS int `default:"50" desc:"kubelet QPS config" split_words:"true"`
+	envs       []corev1.EnvVar
+	caBundle   []byte
+	cert       tls.Certificate
+	once       sync.Once
 }
 
 // Mode internal webhook mode type.
