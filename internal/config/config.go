@@ -52,7 +52,7 @@ type Config struct {
 	CertFilePath          string            `desc:"Path to certificate. Preferred use if specified" split_words:"true"`
 	KeyFilePath           string            `desc:"Path to RSA/Ed25519 related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
 	CABundleFilePath      string            `desc:"Path to cabundle file related to Config.CertFilePath. Preferred use if specified" split_words:"true"`
-	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint" split_words:"true"`
 	MetricsExportInterval time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	SidecarLimitsMemory   string            `default:"80Mi" desc:"Lower bound of the NSM sidecar memory limit (in k8s resource management units)" split_words:"true"`
 	SidecarLimitsCPU      string            `default:"200m" desc:"Lower bound of the NSM sidecar CPU limit (in k8s resource management units)" split_words:"true"`
