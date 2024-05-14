@@ -16,6 +16,31 @@ You can build the docker container by running:
 docker build .
 ```
 
+# Usage
+
+## Environment config
+
+* `NSM_NAME`                    - Name of current admission webhook instance (default: "admission-webhook-k8s")
+* `NSM_SERVICE_NAME`            - Name of service that related to this admission webhook instance (default: "default")
+* `NSM_NAMESPACE`               - Namespace where admission webhook is deployed (default: "default")
+* `NSM_ANNOTATION`              - Name of annotation that means that the resource can be handled by admission-webhook (default: "networkservicemesh.io")
+* `NSM_LABELS`                  - Map of labels and their values that should be appended for each deployment that has Config.Annotation
+* `NSM_NSURL_ENV_NAME`          - Name of env that contains NSURL in initContainers/Containers
+* `NSM_INIT_CONTAINER_IMAGES`   - List of init containers that should be appended for each deployment that has Config.Annotation
+* `NSM_CONTAINER_IMAGES`        - List of containers that should be appended for each deployment that has Config.Annotation
+* `NSM_ENVS`                    - Additional Envs that should be appended for each Config.ContainerImages and Config.InitContainerImages
+* `NSM_WEBHOOK_MODE`            - Default 'spire' mode uses spire certificates and external webhook configuration. Set to 'selfregister' to use the automatically generated webhook configuration (default: "spire")
+* `NSM_CERT_FILE_PATH`          - Path to certificate. Preferred use if specified
+* `NSM_KEY_FILE_PATH`           - Path to RSA/Ed25519 related to Config.CertFilePath. Preferred use if specified
+* `NSM_CA_BUNDLE_FILE_PATH`     - Path to cabundle file related to Config.CertFilePath. Preferred use if specified
+* `NSM_OPEN_TELEMETRY_ENDPOINT` - OpenTelemetry Collector Endpoint (default: "otel-collector.observability.svc.cluster.local:4317")
+* `NSM_METRICS_EXPORT_INTERVAL` - interval between mertics exports (default: "10s")
+* `NSM_SIDECAR_LIMITS_MEMORY`   - Lower bound of the NSM sidecar memory limit (in k8s resource management units) (default: "80Mi")
+* `NSM_SIDECAR_LIMITS_CPU`      - Lower bound of the NSM sidecar CPU limit (in k8s resource management units) (default: "200m")
+* `NSM_SIDECAR_REQUESTS_MEMORY` - Lower bound of the NSM sidecar requests memory limits (in k8s resource management units) (default: "40Mi")
+* `NSM_SIDECAR_REQUESTS_CPU`    - Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units) (default: "100m")
+* `NSM_KUBELET_QPS`             - kubelet QPS config (default: "50")
+
 # Testing
 
 ## Testing Docker container
