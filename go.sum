@@ -96,8 +96,8 @@ github.com/networkservicemesh/api v1.13.4-0.20240815101554-fdbfcd84fd0e h1:Fs34Z
 github.com/networkservicemesh/api v1.13.4-0.20240815101554-fdbfcd84fd0e/go.mod h1:B8FmS3XZ7NZY7ZEtdcNg2NHYppDHlr4kl4eecdZN9eI=
 github.com/networkservicemesh/sdk v0.5.1-0.20240815204907-eeb0114b9426 h1:O4v2cZ78hnnUmDMsQVNfAZuRnHd5ms2cJ3psCWTI65Q=
 github.com/networkservicemesh/sdk v0.5.1-0.20240815204907-eeb0114b9426/go.mod h1:D/CFLQOWMeHTYtKF8KgZmBNaNOfzBclWJj3BIPve7Hk=
-github.com/networkservicemesh/sdk-k8s v0.0.0-20240814134600-f9f55b43a657 h1:X0kVqTn7VQPVo+wVvGrXo+OpnTC7ZWDKmqQX5q8Vrmg=
-github.com/networkservicemesh/sdk-k8s v0.0.0-20240814134600-f9f55b43a657/go.mod h1:ZEJ1hRzewm/DPddS7m6I6ht2tzLwOwaZ2cfaLiXlXWg=
+github.com/networkservicemesh/sdk-k8s v0.0.0-20240815205359-2f6c43d4f381 h1:sr/MDtfwEJhjZ7BCWov9RKRE21hlsYI4MRw2Xdw7dOQ=
+github.com/networkservicemesh/sdk-k8s v0.0.0-20240815205359-2f6c43d4f381/go.mod h1:uAVWHLnJh/By4osotqPSiIZVSr51Ou4ramwBVtg9mh0=
 github.com/onsi/ginkgo/v2 v2.9.4 h1:xR7vG4IXt5RWx6FfIjyAtsoMAtnc3C/rFXBBd2AjZwE=
 github.com/onsi/gomega v1.27.6 h1:ENqfyGeS5AX/rlXDd/ETokDz93u0YufY1Pgxuy/PvWE=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
