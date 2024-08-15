@@ -40,6 +40,8 @@ docker build .
 * `NSM_SIDECAR_REQUESTS_MEMORY` - Lower bound of the NSM sidecar requests memory limits (in k8s resource management units) (default: "40Mi")
 * `NSM_SIDECAR_REQUESTS_CPU`    - Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units) (default: "100m")
 * `NSM_KUBELET_QPS`             - kubelet QPS config (default: "50")
+* `NSM_PPROF_ENABLED`           - is pprof enabled (default: "false")
+* `NSM_PPROF_LISTEN_ON`         - pprof URL to ListenAndServe (default: "localhost:6060")
 
 # Testing
 
