@@ -58,6 +58,7 @@ import (
 	kubeutils "github.com/networkservicemesh/sdk-k8s/pkg/tools/k8s"
 	"github.com/networkservicemesh/sdk/pkg/tools/nsurl"
 	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
+	"github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 )
 
 var deserializer = serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer()
@@ -436,6 +437,11 @@ func main() {
 				logger.Error(err.Error())
 			}
 		}()
+	}
+
+	// Configure pprof
+	if conf.PprofEnabled {
+		go pprofutils.ListenAndServe(ctx, conf.PprofListenOn)
 	}
 
 	if conf.WebhookMode == config.SelfregisterMode {

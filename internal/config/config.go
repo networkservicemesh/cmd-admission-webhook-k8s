@@ -58,6 +58,8 @@ type Config struct {
 	SidecarLimitsCPU      string            `default:"200m" desc:"Lower bound of the NSM sidecar CPU limit (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsMemory string            `default:"40Mi" desc:"Lower bound of the NSM sidecar requests memory limits (in k8s resource management units)" split_words:"true"`
 	SidecarRequestsCPU    string            `default:"100m" desc:"Lower bound of the NSM sidecar requests CPU limits (in k8s resource management units)" split_words:"true"`
+	PprofEnabled          bool              `default:"false" desc:"is pprof enabled" split_words:"true"`
+	PprofListenOn         string            `default:"localhost:6060" desc:"pprof URL to ListenAndServe" split_words:"true"`
 	// QPS for 50 NSC
 	KubeletQPS int `default:"50" desc:"kubelet QPS config" split_words:"true"`
 	envs       []corev1.EnvVar

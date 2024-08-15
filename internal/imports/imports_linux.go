@@ -18,6 +18,7 @@ import (
 	_ "github.com/networkservicemesh/sdk-k8s/pkg/tools/k8s"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/nsurl"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
+	_ "github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 	_ "github.com/pkg/errors"
 	_ "github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	_ "github.com/spiffe/go-spiffe/v2/workloadapi"
