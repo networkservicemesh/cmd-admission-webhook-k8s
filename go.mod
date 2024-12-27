@@ -5,8 +5,8 @@ go 1.23
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.11.3
-	github.com/networkservicemesh/sdk v0.5.1-0.20241224095213-4a9b9a01615e
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20241224095726-0160ee635295
+	github.com/networkservicemesh/sdk v0.5.1-0.20241227142729-d442a26f8532
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20241227143242-fdad908497ef
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.28.3
