@@ -5,8 +5,8 @@ go 1.23
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.11.3
-	github.com/networkservicemesh/sdk v0.5.1-0.20250220123313-acd16f36259e
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20250220123748-228ff158acee
+	github.com/networkservicemesh/sdk v0.5.1-0.20250224082004-755c3b54a4f3
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20250224082609-5a393e9bbe01
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.28.3
@@ -82,7 +82,7 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.13.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
