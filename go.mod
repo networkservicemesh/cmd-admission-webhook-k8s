@@ -5,8 +5,8 @@ go 1.23
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.11.3
-	github.com/networkservicemesh/sdk v0.5.1-0.20250326080154-949530e2d130
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20250326080918-099f83cf0710
+	github.com/networkservicemesh/sdk v0.5.1-0.20250326102733-7599103b13cb
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20250326103202-4a41e292ece9
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.28.3
@@ -19,7 +19,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
