@@ -7,8 +7,8 @@ toolchain go1.24.10
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.11.3
-	github.com/networkservicemesh/sdk v0.5.1-0.20260401123920-4ec46252196e
-	github.com/networkservicemesh/sdk-k8s v0.0.0-20260401124446-371a947f7d62
+	github.com/networkservicemesh/sdk v0.5.1-0.20260407081414-9ac672ca128d
+	github.com/networkservicemesh/sdk-k8s v0.0.0-20260407081927-4c9127fccf3d
 	go.uber.org/zap v1.19.0
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	k8s.io/api v0.32.3
@@ -22,7 +22,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/prometheus/client_golang v1.21.1 // indirect
